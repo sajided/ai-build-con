@@ -100,4 +100,68 @@ describe('Phase 7: Clinical Safety Guardrail Engine (TC-P7-01)', () => {
       expect(evaluation.refusalMessage).toBeNull();
     });
   });
+
+  describe('TC-P7-01 DOM Component Verification', () => {
+    it('renders ClinicalSafetyAlert with exact standardized disclaimer and emergency call action', async () => {
+      const React = (await import('react')).default;
+      const { render, screen } = await import('@testing-library/react');
+      const { ClinicalSafetyAlert } = await import('@/components/safety/ClinicalSafetyAlert');
+
+      render(React.createElement(ClinicalSafetyAlert, { reason: 'Unauthorized insulin bolus dosing' }));
+
+      // Check alert container
+      const alert = screen.getByTestId('clinical-safety-alert');
+      expect(alert).toBeTruthy();
+
+      // Check standardized disclaimer text
+      const refusalText = screen.getByTestId('standardized-clinical-refusal-text');
+      expect(refusalText.textContent).toBe(STANDARDIZED_CLINICAL_REFUSAL);
+
+      // Check emergency call button
+      const emergencyBtn = screen.getByTestId('emergency-call-button');
+      expect(emergencyBtn.getAttribute('href')).toBe('tel:911');
+      expect(emergencyBtn.textContent).toContain('Call Emergency (911)');
+    });
+  });
+
+  describe('TC-P7-02: Production Lighthouse & PWA Audit', () => {
+    it('verifies PWA manifest structure, standalone mode, and icon paths', async () => {
+      const fs = await import('fs');
+      const path = await import('path');
+
+      const manifestPath = path.resolve(process.cwd(), 'public/manifest.json');
+      expect(fs.existsSync(manifestPath)).toBe(true);
+
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+
+      // PWA Threshold Criteria
+      expect(manifest.name).toContain('GlucoVision');
+      expect(manifest.short_name).toBe('GlucoVision');
+      expect(manifest.display).toBe('standalone');
+      expect(manifest.theme_color).toBe('#059669');
+      expect(manifest.background_color).toBe('#0f172a');
+      expect(manifest.orientation).toBe('portrait');
+
+      // Icons check
+      expect(Array.isArray(manifest.icons)).toBe(true);
+      expect(manifest.icons.length).toBeGreaterThanOrEqual(3);
+
+      const has192 = manifest.icons.some((i: { sizes: string }) => i.sizes === '192x192');
+      const has512 = manifest.icons.some((i: { sizes: string }) => i.sizes === '512x512');
+      expect(has192).toBe(true);
+      expect(has512).toBe(true);
+    });
+
+    it('verifies service worker and offline precache fallback assets exist', async () => {
+      const fs = await import('fs');
+      const path = await import('path');
+
+      const swPath = path.resolve(process.cwd(), 'public/sw.js');
+      expect(fs.existsSync(swPath)).toBe(true);
+
+      const offlinePagePath = path.resolve(process.cwd(), 'src/app/~offline/page.tsx');
+      expect(fs.existsSync(offlinePagePath)).toBe(true);
+    });
+  });
 });
+
