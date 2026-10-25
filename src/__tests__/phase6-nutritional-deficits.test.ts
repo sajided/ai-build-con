@@ -1,3 +1,4 @@
+import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   calculateFiberDeficit,
@@ -194,6 +195,43 @@ describe('Phase 6: Nutritional Gap & Deficiency Recommendation Engine', () => {
         expect(item.mechanism).toBeTruthy();
         expect(item.culinaryTip).toBeTruthy();
       });
+    });
+  });
+
+  describe('TC-P6-01 & TC-P6-02 DOM Component Integration', () => {
+    it('renders "Fiber Shield Adequate" badge in DOM when fiber intake is 32g/day', async () => {
+      const { render, screen } = await import('@testing-library/react');
+      const { NutrientProgressMeter } = await import('@/components/deficits/NutrientProgressMeter');
+
+      const analysis = buildDeficiencyAnalysis(32);
+      render(React.createElement(NutrientProgressMeter, { metrics: analysis.metrics }));
+
+      // Assert badge is visible in DOM
+      const badge = screen.getByTestId('fiber-badge');
+      expect(badge).toBeTruthy();
+      expect(badge.textContent).toContain('Fiber Shield Adequate');
+    });
+
+    it('TC-P6-02 DOM: clicking "+ Add to Bazaar List" on Okra / Dherosh triggers cart callback with correct item', async () => {
+      const { render, screen, fireEvent } = await import('@testing-library/react');
+      const { BazaarStapleCard } = await import('@/components/deficits/BazaarStapleCard');
+
+      const okra = BAZAAR_STAPLES_CATALOG.find((item) => item.name.includes('Okra'))!;
+      const onAddToCart = vi.fn();
+
+      render(React.createElement(BazaarStapleCard, { item: okra, onAddToCart }));
+
+      // Find the button with + Add to Bazaar List
+      const button = screen.getByTestId(`add-to-cart-${okra.id}`);
+      expect(button).toBeTruthy();
+      expect(button.textContent).toContain('+ Add to Bazaar List');
+
+      // Click button
+      fireEvent.click(button);
+
+      // Verify callback was fired with Okra / Dherosh
+      expect(onAddToCart).toHaveBeenCalledTimes(1);
+      expect(onAddToCart).toHaveBeenCalledWith(okra);
     });
   });
 });
