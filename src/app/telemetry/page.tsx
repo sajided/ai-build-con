@@ -280,23 +280,30 @@ export default function TelemetryPage() {
           </div>
 
           {/* Forward Action to Phase 6 */}
-          <div className="pt-2 border-t border-slate-800">
+          <div className="pt-2 border-t border-slate-800 space-y-2">
+            <Link
+              href="/deficits"
+              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:brightness-110 text-slate-950 text-xs font-bold flex items-center justify-center space-x-2 transition-all active:scale-95 shadow-md shadow-emerald-600/30"
+            >
+              <span>Analyze Nutritional Gaps & Deficits (Phase 6)</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+
             <Link
               href="/"
-              className="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center justify-center space-x-2 transition-all active:scale-95"
+              className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center justify-center space-x-2 transition-all active:scale-95"
             >
               <span>Back to System Dashboard</span>
-              <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
         </div>
 
         {/* Footer */}
         <footer className="p-3.5 border-t border-slate-800/60 bg-slate-950/70 flex items-center justify-between text-xs text-slate-500">
-          <Link href="/menusafe" className="hover:text-slate-300">
-            MenuSafe Auditor
+          <Link href="/deficits" className="hover:text-emerald-400 font-medium">
+            Bazaar Gap Engine
           </Link>
-          <span className="text-emerald-400 font-medium">Phase 5 Operational</span>
+          <span className="text-emerald-400 font-medium">Phases 0-6 Operational</span>
         </footer>
       </div>
 
