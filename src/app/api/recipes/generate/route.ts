@@ -3,6 +3,7 @@ import { z } from "zod";
 import { generateDiabeticRecipes } from "@/lib/ai/recipe-generator";
 import { getCurrentUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
+import { evaluateClinicalSafety } from "@/lib/safety/guardrails";
 
 const generateRecipeRequestSchema = z.object({
   items: z.array(z.string().min(1)).min(1, "At least one ingredient is required"),
@@ -26,6 +27,20 @@ export async function POST(req: NextRequest) {
     }
 
     const { items, saveToProfile } = parsed.data;
+
+    // TC-P7-01: Clinical Safety Guardrail Inspection
+    const safetyCheck = evaluateClinicalSafety(items.join(' '));
+    if (safetyCheck.isBlocked) {
+      return NextResponse.json(
+        {
+          error: "Clinical Safety Violation",
+          safety_refusal: safetyCheck.refusalMessage,
+          reason: safetyCheck.reason,
+          recipes: [],
+        },
+        { status: 400 }
+      );
+    }
 
     // Generate and clinically audit recipes
     const { recipes } = await generateDiabeticRecipes(items);

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { scanRestaurantMenu } from "@/lib/ai/menu-scanner";
+import { evaluateClinicalSafety } from "@/lib/safety/guardrails";
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,6 +38,21 @@ export async function POST(req: NextRequest) {
         },
         { status: 400 }
       );
+    }
+
+    // TC-P7-01: Clinical Safety Guardrail Inspection
+    if (textInput) {
+      const safetyCheck = evaluateClinicalSafety(textInput);
+      if (safetyCheck.isBlocked) {
+        return NextResponse.json(
+          {
+            error: "Clinical Safety Violation",
+            safety_refusal: safetyCheck.refusalMessage,
+            reason: safetyCheck.reason,
+          },
+          { status: 400 }
+        );
+      }
     }
 
     const result = await scanRestaurantMenu({
