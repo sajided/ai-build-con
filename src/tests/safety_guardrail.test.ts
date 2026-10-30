@@ -135,8 +135,8 @@ describe('Phase 7: Clinical Safety Guardrail Engine (TC-P7-01)', () => {
       const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 
       // PWA Threshold Criteria
-      expect(manifest.name).toContain('GlucoVision');
-      expect(manifest.short_name).toBe('GlucoVision');
+      expect(manifest.name).toContain('Jotno');
+      expect(manifest.short_name).toBe('Jotno');
       expect(manifest.display).toBe('standalone');
       expect(manifest.theme_color).toBe('#059669');
       expect(manifest.background_color).toBe('#0f172a');

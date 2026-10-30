@@ -2,15 +2,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import {
-  ArrowLeft,
-  ShoppingBag,
-  Sparkles,
-  Sliders,
-  CheckCircle2,
-  RefreshCw,
-  TrendingUp,
-} from 'lucide-react';
+import { ShoppingBag, Sparkles, CheckCircle2, RefreshCw, TrendingUp } from 'lucide-react';
+import PageHeader from '@/components/app/PageHeader';
 import { useBazaarCart } from '@/lib/cart/bazaar-cart';
 import { DeficienciesResponse } from '@/lib/validations/deficits';
 import { NutrientProgressMeter } from '@/components/deficits/NutrientProgressMeter';
@@ -104,150 +97,92 @@ export default function DeficitsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 pb-28">
-      {/* Toast Notification (TC-P6-02 verification) */}
+    <>
+      {/* Toast Notification (TC-P6-02 verification) — sits just above the bottom nav */}
       {toastMessage && (
         <div
           role="status"
           data-testid="bazaar-toast"
-          className="fixed top-4 left-1/2 z-50 -translate-x-1/2 w-11/12 max-w-md animate-in fade-in slide-in-from-top-4 duration-300"
+          className="fixed inset-x-0 bottom-[calc(6.25rem+env(safe-area-inset-bottom))] z-50 mx-auto flex w-full max-w-md justify-center px-4"
         >
-          <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/40 bg-slate-900/95 px-4 py-3.5 shadow-2xl backdrop-blur-xl">
-            <div className="rounded-full bg-emerald-500/20 p-1.5 text-emerald-400">
-              <CheckCircle2 className="h-5 w-5" />
-            </div>
-            <p className="flex-1 text-sm font-semibold text-slate-100">
-              {toastMessage}
-            </p>
+          <div className="flex items-center gap-2.5 rounded-full bg-ink py-3 pl-3 pr-5 shadow-float animate-in fade-in">
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-pastel-lime" />
+            <p className="text-sm font-bold text-white">{toastMessage}</p>
           </div>
         </div>
       )}
 
-      {/* Mobile Top Header */}
-      <header className="sticky top-0 z-40 border-b border-slate-800 bg-slate-950/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3.5">
-          <Link
-            href="/"
-            className="flex items-center gap-2 rounded-xl p-1.5 text-slate-400 transition-colors hover:bg-slate-900 hover:text-slate-100"
-          >
-            <ArrowLeft className="h-5 w-5" />
-            <span className="text-xs font-medium">Dashboard</span>
-          </Link>
-
-          <div className="text-center">
-            <h1 className="text-base font-bold text-slate-100">Nutritional Deficits</h1>
-            <p className="text-[10px] text-slate-400">7-Day Gap Sourcing Engine</p>
-          </div>
-
-          {/* Cart Icon with Counter Badge */}
+      <PageHeader
+        title="Nutrition"
+        subtitle="Last 7 days"
+        actions={
           <button
             type="button"
             data-testid="open-cart-button"
             onClick={() => setIsDrawerOpen(true)}
-            className="relative flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-emerald-400 transition-all hover:bg-slate-850 hover:border-emerald-500/40"
+            aria-label="Shopping list"
+            className="relative flex h-11 w-11 items-center justify-center rounded-full bg-white text-ink shadow-soft active:bg-canvas"
           >
-            <ShoppingBag className="h-4 w-4" />
-            <span>List</span>
+            <ShoppingBag className="h-5 w-5" />
             {totalItemCount > 0 && (
               <span
                 data-testid="cart-badge-count"
-                className="ml-1 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[11px] font-bold text-slate-950"
+                className="absolute -right-1 -top-1 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-pastel-coral-strong px-1.5 text-xs font-bold text-white"
               >
                 {totalItemCount}
               </span>
             )}
           </button>
-        </div>
-      </header>
+        }
+      />
 
-      {/* Main Container */}
-      <main className="mx-auto max-w-3xl px-4 pt-5 space-y-6">
-        {/* Benchmark Scenario Selector (TC-P6-01 verification buttons) */}
-        <section className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900/90 to-slate-950 p-4 shadow-xl">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
-              <Sliders className="h-4 w-4 text-emerald-400" />
-              <span>Clinical Test Benchmark Scenarios</span>
-            </div>
-            <span className="text-[11px] text-slate-500 font-mono">TC-P6-01 Matrix</span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 mb-4">
-            {/* Benchmark A: 14g Deficit */}
+      <main className="space-y-6 px-4 pb-5 pt-2">
+        {/* Sample data selector (TC-P6-01 verification buttons) */}
+        <section className="space-y-3">
+          <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
             <button
               type="button"
               data-testid="preset-deficit-14"
               onClick={() => handlePresetSelect('deficit_14')}
-              className={`flex flex-col items-start rounded-xl border p-3 text-left transition-all ${
-                activePreset === 'deficit_14'
-                  ? 'border-rose-500/60 bg-rose-500/10 shadow-lg shadow-rose-950/30'
-                  : 'border-slate-800 bg-slate-900/60 hover:bg-slate-850'
-              }`}
+              aria-pressed={activePreset === 'deficit_14'}
+              className="chip-toggle shrink-0"
             >
-              <div className="flex items-center justify-between w-full mb-1">
-                <span className="text-xs font-bold text-slate-200">Benchmark A</span>
-                <span className="rounded-full bg-rose-500/20 px-2 py-0.5 text-[10px] font-bold text-rose-300">
-                  -16g Deficit
-                </span>
-              </div>
-              <span className="text-xs text-slate-400">
-                Logged Fiber: <strong className="text-rose-400 font-mono">14 g/day</strong>
-              </span>
-              <span className="text-[10px] text-slate-500 mt-1">
-                Triggers high-mucilage staples (Okra, Flax, Isabgol)
-              </span>
+              Sample: low-fibre week
             </button>
-
-            {/* Benchmark B: 32g Optimal */}
             <button
               type="button"
               data-testid="preset-optimal-32"
               onClick={() => handlePresetSelect('optimal_32')}
-              className={`flex flex-col items-start rounded-xl border p-3 text-left transition-all ${
-                activePreset === 'optimal_32'
-                  ? 'border-emerald-500/60 bg-emerald-500/10 shadow-lg shadow-emerald-950/30'
-                  : 'border-slate-800 bg-slate-900/60 hover:bg-slate-850'
-              }`}
+              aria-pressed={activePreset === 'optimal_32'}
+              className="chip-toggle shrink-0"
             >
-              <div className="flex items-center justify-between w-full mb-1">
-                <span className="text-xs font-bold text-slate-200">Benchmark B</span>
-                <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
-                  +2g Optimal
-                </span>
-              </div>
-              <span className="text-xs text-slate-400">
-                Logged Fiber: <strong className="text-emerald-400 font-mono">32 g/day</strong>
-              </span>
-              <span className="text-[10px] text-slate-500 mt-1">
-                Displays &quot;Fiber Shield Adequate&quot; badge
-              </span>
+              Sample: balanced week
             </button>
           </div>
 
-          {/* Custom Interactive Slider */}
-          <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
-            <div className="flex items-center justify-between text-xs mb-1.5">
-              <span className="text-slate-400 font-medium">Interactive Daily Fiber Intake:</span>
-              <span className="font-mono text-sm font-bold text-emerald-400">
-                {sliderFiber} g/day{' '}
-                <span className="text-slate-500 text-xs font-normal">
-                  (Target: 30g)
-                </span>
+          <div className="card p-4">
+            <div className="flex items-baseline justify-between">
+              <label htmlFor="fiber-slider" className="text-sm font-bold text-ink">
+                Daily fibre
+              </label>
+              <span className="text-base font-extrabold text-ink">
+                {sliderFiber} g <span className="text-sm font-semibold text-ink-muted">/ 30 g goal</span>
               </span>
             </div>
             <input
+              id="fiber-slider"
               type="range"
               min="5"
               max="45"
               step="1"
               value={sliderFiber}
               onChange={handleSliderChange}
-              className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-slate-800 accent-emerald-500"
+              className="mt-4 h-2 w-full cursor-pointer appearance-none rounded-full bg-pastel-lime accent-ink"
             />
-            <div className="flex justify-between text-[10px] text-slate-500 mt-1">
-              <span>5g (Critical Deficit)</span>
-              <span className="font-semibold text-emerald-500">30g (Target)</span>
-              <span>45g (High Barrier)</span>
+            <div className="mt-2 flex justify-between text-xs font-semibold text-ink-muted">
+              <span>5 g</span>
+              <span className="text-pastel-lime-ink">30 g goal</span>
+              <span>45 g</span>
             </div>
           </div>
         </section>
@@ -255,82 +190,62 @@ export default function DeficitsPage() {
         {/* Nutritional Deficit Meters */}
         <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-300">
-              7-Day Metabolic Progress Meters
-            </h2>
-            {isLoading && (
-              <RefreshCw className="h-4 w-4 animate-spin text-emerald-400" />
-            )}
+            <h2 className="section-title">Your intake vs goals</h2>
+            {isLoading && <RefreshCw className="h-4 w-4 animate-spin text-ink-muted" />}
           </div>
 
           {analysis ? (
             <NutrientProgressMeter metrics={analysis.metrics} />
           ) : (
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-8 text-center text-slate-500">
-              Loading metabolic telemetry...
+            <div className="card p-8 text-center text-sm text-ink-muted">
+              Loading your nutrition…
             </div>
           )}
         </section>
 
-        {/* Clinical Summary Insight */}
+        {/* Summary */}
         {analysis && (
           <section
             data-testid="deficits-summary-card"
-            className="rounded-2xl border border-slate-800 bg-gradient-to-r from-emerald-950/20 via-slate-900/60 to-purple-950/20 p-4 shadow-lg"
+            className="tile bg-pastel-peach p-5 text-pastel-peach-ink"
           >
             <div className="flex items-start gap-3">
-              <div className="rounded-xl bg-emerald-500/10 p-2 text-emerald-400 border border-emerald-500/20 mt-0.5">
+              <div className="icon-badge bg-white/85 text-pastel-peach-ink">
                 <Sparkles className="h-5 w-5" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-slate-100 mb-1">
-                  Clinical Synthesis & Metabolic Pivot
-                </h3>
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  {analysis.summaryStatement}
-                </p>
-                <div className="mt-2.5 flex items-center gap-3 text-xs">
-                  <Link
-                    href="/telemetry"
-                    className="inline-flex items-center gap-1 font-semibold text-emerald-400 hover:underline"
-                  >
-                    <TrendingUp className="h-3.5 w-3.5" />
-                    <span>View Glucose Trajectory</span>
-                  </Link>
-                </div>
+                <h3 className="mb-1 text-base font-extrabold">What this means</h3>
+                <p className="text-sm font-medium leading-relaxed">{analysis.summaryStatement}</p>
+                <Link
+                  href="/telemetry"
+                  className="chip mt-3 h-11 px-4"
+                >
+                  <TrendingUp className="h-4 w-4" />
+                  <span>See your glucose trend</span>
+                </Link>
               </div>
             </div>
           </section>
         )}
 
-        {/* Bridge the Gap Bazaar Recommendation Cards */}
+        {/* Recommendations */}
         <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-bold uppercase tracking-wider text-slate-300">
-                Bridge the Gap: Local Bazaar Recommendations
-              </h2>
-              <p className="text-xs text-slate-500">
-                Clinically matched low-GI South Asian staples with verified market pricing
-              </p>
-            </div>
+          <div>
+            <h2 className="section-title">Foods to add</h2>
+            <p className="text-sm text-ink-soft">Low-GI local staples that help close the gap</p>
           </div>
 
           {analysis?.recommendations && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div className="grid grid-cols-1 gap-3">
               {analysis.recommendations.map((item) => (
-                <BazaarStapleCard
-                  key={item.id}
-                  item={item}
-                  onAddToCart={addToCart}
-                />
+                <BazaarStapleCard key={item.id} item={item} onAddToCart={addToCart} />
               ))}
             </div>
           )}
         </section>
       </main>
 
-      {/* Slide-out Bazaar Shopping List Drawer */}
+      {/* Shopping list bottom sheet */}
       <BazaarCartDrawer
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
@@ -342,6 +257,6 @@ export default function DeficitsPage() {
         onClearCart={clearCart}
         getExportText={getExportText}
       />
-    </div>
+    </>
   );
 }

@@ -1,16 +1,19 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Outfit } from "next/font/google";
+import { Nunito, Noto_Sans_Bengali } from "next/font/google";
 import "./globals.css";
+import AppShell from "@/components/app/AppShell";
 
-const inter = Inter({
+const nunito = Nunito({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-nunito",
   display: "swap",
 });
 
-const outfit = Outfit({
-  subsets: ["latin"],
-  variable: "--font-outfit",
+// Bangla glyphs for the elder assistant; Nunito has no Bengali script
+const notoBengali = Noto_Sans_Bengali({
+  subsets: ["bengali"],
+  weight: ["400", "600", "700"],
+  variable: "--font-bengali",
   display: "swap",
 });
 
@@ -19,11 +22,12 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: "cover",
   themeColor: "#059669",
 };
 
 export const metadata: Metadata = {
-  title: "GlucoVision – AI Diabetic Nutrition & Metabolic Assistant",
+  title: "Jotno – AI Diabetic Nutrition & Metabolic Assistant",
   description:
     "AI-powered multimodal metabolic companion for diabetic and pre-diabetic patients.",
   manifest: "/manifest.json",
@@ -33,8 +37,8 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
-    title: "GlucoVision",
+    statusBarStyle: "default",
+    title: "Jotno",
   },
 };
 
@@ -44,17 +48,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${outfit.variable} dark`}>
-      <head>
-        <meta
-          name="viewport"
-          content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
-        />
-        <meta name="theme-color" content="#059669" />
-        <link rel="manifest" href="/manifest.json" />
-      </head>
-      <body className="min-h-screen bg-[#090d16] text-slate-100 font-sans antialiased selection:bg-emerald-500/30 selection:text-emerald-300">
-        {children}
+    <html lang="en" className={`${nunito.variable} ${notoBengali.variable}`}>
+      <body className="min-h-screen bg-backdrop font-sans text-ink antialiased selection:bg-pastel-blue">
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

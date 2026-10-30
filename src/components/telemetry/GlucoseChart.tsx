@@ -38,48 +38,34 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
     const isInRange = actualVal !== null && actualVal !== undefined && actualVal >= 70 && actualVal <= 140;
 
     return (
-      <div className="p-3 bg-slate-900/95 border border-slate-700/80 rounded-2xl shadow-xl backdrop-blur-md text-xs space-y-1.5 min-w-[170px]">
-        <div className="font-bold text-slate-200 border-b border-slate-800 pb-1 flex items-center justify-between">
+      <div className="min-w-[170px] space-y-1.5 rounded-2xl bg-white p-3 text-sm shadow-soft">
+        <div className="flex items-center justify-between gap-2 border-b border-line pb-1 font-bold text-ink">
           <span>{label || `Day ${point.day}`}</span>
           {point.context && (
-            <span className="text-[10px] uppercase font-semibold text-teal-400 bg-teal-950/60 px-1.5 py-0.5 rounded border border-teal-800/60">
-              {point.context.replace("_", " ")}
-            </span>
+            <span className="text-xs font-semibold capitalize text-ink-muted">{point.context.replace("_", " ")}</span>
           )}
         </div>
 
         {actualVal !== null && actualVal !== undefined ? (
-          <div className="space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-slate-400">Actual Log:</span>
-              <span className="font-extrabold text-emerald-400 text-sm">
-                {actualVal} <span className="text-[10px] font-normal text-slate-400">mg/dL</span>
-              </span>
-            </div>
-            <div className="text-[10px]">
-              {isInRange ? (
-                <span className="text-emerald-400 font-medium">✓ In Safe Range (70-140)</span>
-              ) : (
-                <span className="text-amber-400 font-medium">⚠ Above Safe Zone</span>
-              )}
-            </div>
+          <div className="flex items-center justify-between">
+            <span className="text-ink-muted">Reading</span>
+            <span className={`font-bold ${isInRange ? "text-risk-safeInk" : "text-risk-cautionInk"}`}>
+              {actualVal} <span className="text-xs font-normal text-ink-muted">mg/dL</span>
+            </span>
           </div>
         ) : (
-          <div className="text-[11px] text-slate-500 italic">No logged reading for this day</div>
+          <div className="text-ink-muted">No reading this day</div>
         )}
 
-        <div className="flex items-center justify-between pt-1 border-t border-slate-800/80 text-[11px]">
-          <span className="text-purple-400">AI Target:</span>
-          <span className="font-bold text-purple-300">
-            {targetVal} <span className="text-[9px] font-normal text-slate-400">mg/dL</span>
+        <div className="flex items-center justify-between">
+          <span className="text-ink-muted">Target</span>
+          <span className="font-bold text-pastel-lilac-ink">
+            {targetVal} <span className="text-xs font-normal text-ink-muted">mg/dL</span>
           </span>
         </div>
 
         {point.linked_meal && (
-          <div className="mt-1 pt-1 border-t border-slate-800 text-[10px] text-slate-300">
-            <span className="text-teal-400 font-medium">Linked Meal: </span>
-            <span>{point.linked_meal}</span>
-          </div>
+          <div className="border-t border-line pt-1 text-xs text-ink-soft">{point.linked_meal}</div>
         )}
       </div>
     );
@@ -97,27 +83,22 @@ export default function GlucoseChart({ data, height = 300 }: GlucoseChartProps) 
   }));
 
   return (
-    <div className="w-full relative rounded-2xl bg-slate-950/80 p-3 sm:p-4 border border-slate-800/90 shadow-inner">
+    <div className="card relative w-full p-4">
       {/* Chart Title and Safe Zone Indicator */}
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-3 px-1">
-        <div className="flex items-center space-x-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-            Dual-Trajectory Glucose Dynamics
-          </span>
-        </div>
-        <div className="flex items-center space-x-3 text-[11px]">
-          <div className="flex items-center space-x-1.5">
-            <span className="w-3 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
-            <span className="text-slate-300 font-medium">Actual Log</span>
+      <div className="mb-3 space-y-2">
+        <h2 className="text-base font-bold text-ink">Trend</h2>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold text-ink-soft">
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block h-1.5 w-3 rounded-full bg-pastel-blue-strong"></span>
+            <span>Your readings</span>
           </div>
-          <div className="flex items-center space-x-1.5">
-            <span className="w-3 h-1 border-b-2 border-dashed border-purple-400 inline-block"></span>
-            <span className="text-purple-300 font-medium">Target Trajectory</span>
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block h-1 w-3 border-b-2 border-dashed border-pastel-lilac-strong"></span>
+            <span>Target path</span>
           </div>
-          <div className="flex items-center space-x-1.5">
-            <span className="w-2.5 h-2.5 rounded bg-emerald-500/20 border border-emerald-500/50 inline-block"></span>
-            <span className="text-emerald-400 font-medium">Safe Zone (70-140)</span>
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block h-2.5 w-2.5 rounded bg-pastel-lime"></span>
+            <span>Healthy range</span>
           </div>
         </div>
       </div>
@@ -129,22 +110,22 @@ export default function GlucoseChart({ data, height = 300 }: GlucoseChartProps) 
             data={sanitizedData}
             margin={{ top: 15, right: 15, left: -15, bottom: 5 }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" opacity={0.6} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#EEECE4" vertical={false} />
 
             <XAxis
               dataKey="date_label"
-              stroke="#64748b"
-              fontSize={10}
+              stroke="#8A8E95"
+              fontSize={11}
               tickLine={false}
-              axisLine={{ stroke: "#334155" }}
+              axisLine={false}
             />
 
             <YAxis
               domain={[60, 180]}
-              stroke="#64748b"
-              fontSize={10}
+              stroke="#8A8E95"
+              fontSize={11}
               tickLine={false}
-              axisLine={{ stroke: "#334155" }}
+              axisLine={false}
               ticks={[70, 100, 140, 160, 180]}
             />
 
@@ -152,24 +133,22 @@ export default function GlucoseChart({ data, height = 300 }: GlucoseChartProps) 
             <ReferenceArea
               y1={70}
               y2={140}
-              fill="#10b981"
-              fillOpacity={0.08}
-              stroke="#10b981"
-              strokeOpacity={0.25}
-              strokeDasharray="4 4"
+              fill="#E1ECB2"
+              fillOpacity={0.6}
+              stroke="none"
             />
 
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={<CustomTooltip />} cursor={{ stroke: "#E6E3D8" }} />
 
-            {/* Line 1: Actual Patient Readings (Solid Emerald Line) */}
+            {/* Line 1: Actual Patient Readings (Solid Blue Line) */}
             <Line
               type="monotone"
               dataKey="actual"
               name="Actual Reading"
-              stroke="#10b981"
-              strokeWidth={2.5}
-              dot={{ r: 4, fill: "#10b981", strokeWidth: 1.5, stroke: "#022c22" }}
-              activeDot={{ r: 6, fill: "#34d399", stroke: "#047857" }}
+              stroke="#7FA7EE"
+              strokeWidth={3}
+              dot={{ r: 4, fill: "#7FA7EE", strokeWidth: 2, stroke: "#FFFFFF" }}
+              activeDot={{ r: 6, fill: "#7FA7EE", stroke: "#FFFFFF", strokeWidth: 2 }}
               connectNulls={true}
             />
 
@@ -178,7 +157,7 @@ export default function GlucoseChart({ data, height = 300 }: GlucoseChartProps) 
               type="linear"
               dataKey="target"
               name="Predicted Target"
-              stroke="#a855f7"
+              stroke="#9F88EA"
               strokeWidth={2}
               strokeDasharray="5 5"
               dot={false}
@@ -187,9 +166,7 @@ export default function GlucoseChart({ data, height = 300 }: GlucoseChartProps) 
         </ResponsiveContainer>
       </div>
 
-      <div className="mt-2 text-center text-[10px] text-slate-500">
-        Safe Zone reference: ADA clinical fasting & postprandial glycemic boundaries (70–140 mg/dL).
-      </div>
+      <p className="mt-2 text-xs font-medium text-ink-muted">Healthy range is 70–140 mg/dL.</p>
     </div>
   );
 }

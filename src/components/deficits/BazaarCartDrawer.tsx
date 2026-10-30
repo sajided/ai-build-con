@@ -56,22 +56,24 @@ export function BazaarCartDrawer({
       role="dialog"
       aria-modal="true"
       data-testid="bazaar-cart-drawer"
-      className="fixed inset-0 z-50 flex justify-end overflow-hidden bg-slate-950/70 backdrop-blur-sm transition-opacity"
+      aria-label="Shopping list"
+      className="fixed inset-0 z-50 flex flex-col justify-end bg-black/30"
     >
-      {/* Click outside backdrop to close */}
+      {/* Tap backdrop to close */}
       <div className="flex-1" onClick={onClose} />
 
-      {/* Drawer Container */}
-      <div className="relative flex w-full max-w-md flex-col bg-slate-900 border-l border-slate-800 shadow-2xl animate-in slide-in-from-right duration-200">
+      {/* Bottom sheet */}
+      <div className="relative mx-auto flex max-h-[85dvh] w-full max-w-md flex-col rounded-t-[32px] bg-white shadow-float animate-in slide-in-from-bottom">
+        <div className="mx-auto mt-2.5 h-1.5 w-10 rounded-full bg-line" aria-hidden="true" />
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
+        <div className="flex items-center justify-between px-5 py-3">
           <div className="flex items-center gap-2.5">
-            <div className="rounded-xl bg-emerald-500/10 p-2 text-emerald-400 border border-emerald-500/20">
+            <div className="icon-badge bg-pastel-lime text-pastel-lime-ink">
               <ShoppingBag className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="font-bold text-slate-100 text-lg">Local Bazaar List</h3>
-              <p className="text-xs text-slate-400">
+              <h3 className="text-lg font-bold text-ink">Shopping list</h3>
+              <p className="text-sm text-ink-muted">
                 {totalItemCount} {totalItemCount === 1 ? 'item' : 'items'} planned
               </p>
             </div>
@@ -80,20 +82,21 @@ export function BazaarCartDrawer({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+            aria-label="Close"
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-canvas text-ink-soft active:bg-line"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Cart Item List */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+        <div className="flex-1 space-y-2 overflow-y-auto px-5 pb-4 pt-1">
           {cart.length === 0 ? (
             <div className="py-16 text-center">
-              <ShoppingBag className="mx-auto h-12 w-12 text-slate-600 mb-3" />
-              <p className="text-slate-300 font-medium">Your Bazaar List is empty</p>
-              <p className="text-xs text-slate-500 max-w-xs mx-auto mt-1">
-                Add recommended high-mucilage vegetables to fill your 7-day fiber & micronutrient deficit.
+              <ShoppingBag className="mx-auto mb-3 h-12 w-12 text-ink-muted" />
+              <p className="font-bold text-ink">Your list is empty</p>
+              <p className="mx-auto mt-1 max-w-xs text-sm text-ink-muted">
+                Add foods from the suggestions to build your shopping list.
               </p>
             </div>
           ) : (
@@ -101,34 +104,34 @@ export function BazaarCartDrawer({
               <div
                 key={cartItem.item.id}
                 data-testid={`cart-row-${cartItem.item.id}`}
-                className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/60 p-3 shadow-sm"
+                className="flex items-center justify-between rounded-2xl bg-canvas p-3"
               >
                 <div className="flex-1 pr-3">
-                  <div className="font-semibold text-sm text-slate-200">
+                  <div className="text-sm font-bold text-ink">
                     {cartItem.item.name}
                   </div>
-                  <div className="text-xs text-emerald-400 font-medium">
+                  <div className="text-sm font-semibold text-ink-soft">
                     {cartItem.item.priceEstimate}
                   </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
+                  <div className="mt-0.5 text-xs text-ink-muted">
                     {cartItem.item.primaryNutrient}
                   </div>
                 </div>
 
                 {/* Quantity Controls */}
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center rounded-lg border border-slate-700 bg-slate-900">
+                  <div className="flex items-center rounded-full bg-white shadow-sm">
                     <button
                       type="button"
                       aria-label="Decrease quantity"
                       onClick={() =>
                         onUpdateQuantity(cartItem.item.id, cartItem.quantity - 1)
                       }
-                      className="p-1.5 text-slate-400 hover:text-white"
+                      className="flex h-10 w-10 items-center justify-center rounded-full text-ink-soft active:bg-canvas"
                     >
-                      <Minus className="h-3.5 w-3.5" />
+                      <Minus className="h-4 w-4" />
                     </button>
-                    <span className="w-7 text-center font-mono text-xs font-bold text-slate-100">
+                    <span className="w-7 text-center text-sm font-bold text-ink">
                       {cartItem.quantity}
                     </span>
                     <button
@@ -137,9 +140,9 @@ export function BazaarCartDrawer({
                       onClick={() =>
                         onUpdateQuantity(cartItem.item.id, cartItem.quantity + 1)
                       }
-                      className="p-1.5 text-slate-400 hover:text-white"
+                      className="flex h-10 w-10 items-center justify-center rounded-full text-ink-soft active:bg-canvas"
                     >
-                      <Plus className="h-3.5 w-3.5" />
+                      <Plus className="h-4 w-4" />
                     </button>
                   </div>
 
@@ -147,7 +150,7 @@ export function BazaarCartDrawer({
                     type="button"
                     aria-label="Remove item"
                     onClick={() => onRemoveItem(cartItem.item.id)}
-                    className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-slate-800"
+                    className="flex h-10 w-10 items-center justify-center rounded-full text-ink-muted active:bg-risk-danger active:text-risk-dangerInk"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -159,10 +162,10 @@ export function BazaarCartDrawer({
 
         {/* Footer with Subtotal & Export */}
         {cart.length > 0 && (
-          <div className="border-t border-slate-800 bg-slate-950/80 p-5 space-y-3">
+          <div className="space-y-3 border-t border-line px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-400">Estimated Sourcing Total:</span>
-              <span className="font-mono text-base font-bold text-emerald-400">
+              <span className="text-ink-muted">Estimated total</span>
+              <span className="text-base font-extrabold text-ink">
                 ~${estimatedTotalCost.toFixed(2)}
               </span>
             </div>
@@ -171,17 +174,17 @@ export function BazaarCartDrawer({
               <button
                 type="button"
                 onClick={handleCopy}
-                className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow-md hover:bg-emerald-500 active:scale-[0.98]"
+                className="btn-primary text-sm"
               >
                 {copied ? (
                   <>
-                    <Check className="h-4 w-4 text-emerald-200" />
-                    <span>Copied List!</span>
+                    <Check className="h-4 w-4" />
+                    <span>Copied!</span>
                   </>
                 ) : (
                   <>
                     <Share2 className="h-4 w-4" />
-                    <span>WhatsApp / Share</span>
+                    <span>Share</span>
                   </>
                 )}
               </button>
@@ -189,19 +192,19 @@ export function BazaarCartDrawer({
               <button
                 type="button"
                 onClick={handleCopy}
-                className="flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-850 px-4 py-2.5 text-xs font-semibold text-slate-200 hover:bg-slate-800 active:scale-[0.98]"
+                className="btn-secondary text-sm"
               >
                 <Copy className="h-4 w-4" />
-                <span>Copy Text</span>
+                <span>Copy text</span>
               </button>
             </div>
 
             <button
               type="button"
               onClick={onClearCart}
-              className="w-full text-center text-xs text-slate-500 hover:text-rose-400 pt-1"
+              className="h-11 w-full text-center text-sm font-semibold text-ink-muted active:text-risk-dangerInk"
             >
-              Clear Bazaar List
+              Clear list
             </button>
           </div>
         )}

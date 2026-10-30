@@ -1,5 +1,5 @@
 -- ==============================================================================
--- GlucoVision Phase 1 Database Migration: Schema, RLS & Storage
+-- Jotno Phase 1 Database Migration: Schema, RLS & Storage
 -- Conforms to Section 5 of PRD and Phase 1 Implementation Roadmap
 -- ==============================================================================
 

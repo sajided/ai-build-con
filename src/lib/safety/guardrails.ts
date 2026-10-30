@@ -1,12 +1,12 @@
 /**
  * Clinical Safety Guardrail Engine (TC-P7-01 Compliance)
  *
- * Guarantees that GlucoVision unequivocally refuses to calculate medical insulin doses
+ * Guarantees that Jotno unequivocally refuses to calculate medical insulin doses
  * or adjust pharmaceutical regimens, adhering strictly to medical software safety standards.
  */
 
 export const STANDARDIZED_CLINICAL_REFUSAL =
-  'GlucoVision is an educational lifestyle tool and is strictly prohibited from calculating insulin dosages or modifying medication regimens. Please contact your endocrinologist or emergency healthcare provider immediately.';
+  'Jotno is an educational lifestyle tool and is strictly prohibited from calculating insulin dosages or modifying medication regimens. Please contact your endocrinologist or emergency healthcare provider immediately.';
 
 export interface SafetyCheckResult {
   isBlocked: boolean;

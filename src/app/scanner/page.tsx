@@ -1,44 +1,30 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useRef } from "react";
 import Link from "next/link";
 import {
   Camera,
   Sparkles,
-  ArrowLeft,
   ArrowRight,
   ShieldCheck,
   AlertTriangle,
   RefreshCw,
   ChefHat,
-  Eye,
   Utensils,
+  ShoppingBasket,
+  CircleCheck,
+  CircleAlert,
 } from "lucide-react";
 import type { BazaarScanResponse, ScannedItem } from "@/lib/validations/scanner";
-import type { OnboardingFormData } from "@/lib/validations/onboarding";
+import PageHeader from "@/components/app/PageHeader";
 
 export default function ScannerPage() {
-  const [profile, setProfile] = useState<Partial<OnboardingFormData> | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [scanResult, setScanResult] = useState<BazaarScanResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState<"all" | "green" | "yellow" | "red">("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Load clinical profile from Phase 1 onboarding
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("glucovision_profile");
-      if (stored) {
-        try {
-          setProfile(JSON.parse(stored));
-        } catch {
-          // Fallback if parsing fails
-        }
-      }
-    }
-  }, []);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -56,8 +42,8 @@ export default function ScannerPage() {
 
   const handleLoadPreset = async () => {
     setError(null);
-    // Representative placeholder photo of fresh vegetables & pulses
-    const presetSvg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="600" height="400" fill="%23064e3b"/><text x="50%25" y="45%25" dominant-baseline="middle" text-anchor="middle" fill="%2334d399" font-family="sans-serif" font-size="22" font-weight="bold">Standard Regional Bazaar Basket</text><text x="50%25" y="58%25" dominant-baseline="middle" text-anchor="middle" fill="%23a7f3d0" font-family="sans-serif" font-size="14">[Potatoes, Bitter Gourd, Lentils, White Rice, Chilies]</text></svg>`;
+    // Representative placeholder photo of fresh vegetables & pulses (TC-P2-01 preset)
+    const presetSvg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="600" height="400" fill="%23CFE0FA"/><text x="50%25" y="45%25" dominant-baseline="middle" text-anchor="middle" fill="%231F3D72" font-family="sans-serif" font-size="22" font-weight="bold">Sample Bazaar Basket</text><text x="50%25" y="58%25" dominant-baseline="middle" text-anchor="middle" fill="%234A4F57" font-family="sans-serif" font-size="14">[Potatoes, Bitter Gourd, Lentils, White Rice, Chilies]</text></svg>`;
     setImagePreview(presetSvg);
     executeScan("mock-preset", null);
   };
@@ -117,344 +103,213 @@ export default function ScannerPage() {
     red: scanResult?.scanned_items.filter((i) => i.risk_category === "red").length || 0,
   };
 
+  const filters = [
+    { key: "all" as const, label: "All", count: scanResult?.scanned_items.length || 0, dot: "" },
+    { key: "green" as const, label: "Safe", count: counts.green, dot: "bg-pastel-lime-strong" },
+    { key: "yellow" as const, label: "Caution", count: counts.yellow, dot: "bg-pastel-peach-strong" },
+    { key: "red" as const, label: "Risky", count: counts.red, dot: "bg-pastel-coral-strong" },
+  ];
+
   return (
-    <main className="min-h-screen bg-[#070b12] text-slate-100 flex items-center justify-center p-3 sm:p-6 lg:p-8">
-      {/* Mobile-first Scanner Container */}
-      <div className="w-full max-w-lg bg-gradient-to-b from-[#0d1527] to-[#080d18] rounded-3xl border border-slate-800 shadow-2xl overflow-hidden backdrop-blur-xl relative flex flex-col">
-        {/* Glow ambient header */}
-        <div className="absolute top-0 inset-x-0 h-36 bg-gradient-to-b from-emerald-500/15 via-emerald-600/5 to-transparent pointer-events-none" />
+    <>
+      <PageHeader title="Scan" subtitle="Check foods before you buy or order" />
 
-        {/* Top Header */}
-        <header className="px-5 pt-5 pb-4 border-b border-slate-800/60 relative z-10 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Link
-              href="/"
-              className="w-8 h-8 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-white transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Link>
-            <div>
-              <div className="flex items-center space-x-2">
-                <h1 className="text-base font-bold text-white font-heading">
-                  Bazaar Vision Scanner
-                </h1>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                  Phase 2 AI
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400">
-                Patient: {profile?.fullName || "Alex Rivera"} ({profile?.diabetesType ? profile.diabetesType.replace("_", " ") : "Type 2"})
-              </p>
-            </div>
-          </div>
-
-          <Link
-            href="/onboarding"
-            className="text-[11px] font-medium text-emerald-400 hover:underline px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20"
+      <main className="px-4 py-4 space-y-5">
+        {/* Groceries / Menu segmented control */}
+        <div className="grid grid-cols-2 gap-1 rounded-full bg-white p-1 shadow-soft">
+          <span
+            aria-current="page"
+            className="flex h-11 items-center justify-center gap-2 rounded-full bg-ink text-sm font-bold text-white"
           >
-            Profile
-          </Link>
-        </header>
-
-        {/* Top Mode Switcher Tabs */}
-        <div className="p-2 bg-slate-950/80 border-b border-slate-800/80 flex space-x-1.5 relative z-10">
-          <button
-            type="button"
-            className="flex-1 py-2 rounded-xl text-center text-xs font-bold bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20 flex items-center justify-center space-x-1.5"
-          >
-            <Camera className="w-3.5 h-3.5" />
-            <span>Bazaar Groceries</span>
-          </button>
+            <ShoppingBasket className="h-4 w-4" />
+            Groceries
+          </span>
           <Link
             href="/menusafe"
-            className="flex-1 py-2 rounded-xl text-center text-xs font-semibold text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center space-x-1.5"
+            className="flex h-11 items-center justify-center gap-2 rounded-full text-sm font-semibold text-ink-soft active:bg-canvas"
           >
-            <Utensils className="w-3.5 h-3.5 text-amber-400" />
-            <span>Restaurant MenuSafe</span>
+            <Utensils className="h-4 w-4" />
+            Restaurant menu
           </Link>
         </div>
 
-        {/* Main Content */}
-        <div className="p-5 space-y-4 relative z-10 overflow-y-auto max-h-[80vh]">
-          {error && (
-            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center space-x-2">
-              <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
-              <span>{error}</span>
-            </div>
-          )}
+        {error && (
+          <div className="flex items-start gap-2 rounded-2xl bg-risk-danger p-4 text-sm font-semibold text-risk-dangerInk">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
 
-          {/* Viewfinder & Image Preview Box */}
-          <div className="relative rounded-2xl border border-slate-800 bg-slate-950/70 overflow-hidden min-h-[180px] flex items-center justify-center">
-            {imagePreview ? (
-              <div className="relative w-full h-48 bg-slate-900 flex items-center justify-center overflow-hidden">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={imagePreview}
-                  alt="Grocery Scan Preview"
-                  className="w-full h-full object-cover"
-                />
+        {/* Hidden File Input */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileUpload}
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+        />
 
-                {/* Laser scan animation when processing */}
-                {isScanning && (
-                  <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_15px_#10b981] animate-[bounce_1.5s_infinite]" />
-                )}
+        {/* Viewfinder & Image Preview */}
+        {imagePreview ? (
+          <div className="relative h-56 overflow-hidden rounded-[28px] bg-pastel-blue shadow-soft">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={imagePreview} alt="Grocery photo" className="h-full w-full object-cover" />
 
-                {isScanning && (
-                  <div className="absolute inset-0 bg-emerald-950/40 backdrop-blur-[2px] flex items-center justify-center">
-                    <div className="px-3.5 py-2 rounded-xl bg-slate-950/90 border border-emerald-500/50 text-emerald-300 text-xs font-medium flex items-center space-x-2 shadow-xl">
-                      <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
-                      <span>Gemini 1.5 Multimodal Extraction...</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="p-6 text-center space-y-3">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto text-emerald-400">
-                  <Camera className="w-6 h-6" />
-                </div>
-                <div>
-                  <h2 className="text-xs font-semibold text-slate-200">
-                    Snap or Upload Grocery Photo
-                  </h2>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Capture raw bazaar stall items, grocery carts, or kitchen produce.
-                  </p>
+            {isScanning && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-[2px]">
+                <div className="flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-bold text-ink shadow-float">
+                  <RefreshCw className="h-4 w-4 animate-spin text-pastel-blue-strong" />
+                  <span>Identifying foods…</span>
                 </div>
               </div>
             )}
           </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isScanning}
+            className="tile flex h-60 w-full flex-col items-center justify-center gap-4 bg-pastel-blue text-center text-pastel-blue-ink active:brightness-95 disabled:opacity-50"
+          >
+            <span className="fab h-16 w-16 bg-pastel-blue-strong">
+              <Camera className="h-7 w-7" />
+            </span>
+            <span>
+              <span className="block text-lg font-extrabold">Take a photo of your groceries</span>
+              <span className="mt-1 block text-sm font-semibold opacity-80">
+                Market stalls, shopping carts or produce at home
+              </span>
+            </span>
+          </button>
+        )}
 
-          {/* Hidden File Input */}
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileUpload}
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-          />
-
-          {/* Trigger Actions */}
-          <div className="grid grid-cols-2 gap-2.5">
+        {/* Trigger Actions */}
+        <div className="space-y-2.5">
+          {imagePreview && (
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isScanning}
-              className="py-2.5 px-3 rounded-xl bg-emerald-500 text-slate-950 text-xs font-semibold hover:bg-emerald-400 transition-all flex items-center justify-center space-x-1.5 shadow-md shadow-emerald-500/20 active:scale-95 disabled:opacity-50"
+              className="btn-secondary"
             >
-              <Camera className="w-3.5 h-3.5" />
-              <span>Camera / Upload</span>
+              <Camera className="h-5 w-5" />
+              Take another photo
             </button>
-
-            <button
-              type="button"
-              onClick={handleLoadPreset}
-              disabled={isScanning}
-              className="py-2.5 px-3 rounded-xl bg-slate-900 border border-slate-700/80 text-slate-200 text-xs font-medium hover:bg-slate-800 transition-all flex items-center justify-center space-x-1.5 active:scale-95 disabled:opacity-50"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Load TC-P2-01 Preset</span>
-            </button>
-          </div>
-
-          {/* Scan Results Display */}
-          {scanResult && (
-            <div className="space-y-4 pt-2 animate-in fade-in duration-300">
-              {/* Traffic-Light Summary Bar */}
-              <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-slate-200 flex items-center space-x-1.5">
-                    <Eye className="w-4 h-4 text-emerald-400" />
-                    <span>Detected Produce ({scanResult.scanned_items.length} Items)</span>
-                  </span>
-                  <span className="text-[11px] text-emerald-400 font-mono">
-                    TC-P2-02 Verified
-                  </span>
-                </div>
-
-                {/* Filter Pills */}
-                <div className="grid grid-cols-4 gap-1.5 text-[11px] font-medium">
-                  <button
-                    onClick={() => setFilterCategory("all")}
-                    className={`py-1.5 rounded-lg border transition-all ${
-                      filterCategory === "all"
-                        ? "bg-slate-700 text-white border-slate-600"
-                        : "bg-slate-950/60 text-slate-400 border-slate-800 hover:border-slate-700"
-                    }`}
-                  >
-                    All ({scanResult.scanned_items.length})
-                  </button>
-
-                  <button
-                    onClick={() => setFilterCategory("green")}
-                    className={`py-1.5 rounded-lg border transition-all flex items-center justify-center space-x-1 ${
-                      filterCategory === "green"
-                        ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-sm"
-                        : "bg-slate-950/60 text-emerald-400 border-slate-800 hover:border-slate-700"
-                    }`}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                    <span>Safe ({counts.green})</span>
-                  </button>
-
-                  <button
-                    onClick={() => setFilterCategory("yellow")}
-                    className={`py-1.5 rounded-lg border transition-all flex items-center justify-center space-x-1 ${
-                      filterCategory === "yellow"
-                        ? "bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm"
-                        : "bg-slate-950/60 text-amber-400 border-slate-800 hover:border-slate-700"
-                    }`}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                    <span>Caution ({counts.yellow})</span>
-                  </button>
-
-                  <button
-                    onClick={() => setFilterCategory("red")}
-                    className={`py-1.5 rounded-lg border transition-all flex items-center justify-center space-x-1 ${
-                      filterCategory === "red"
-                        ? "bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-sm"
-                        : "bg-slate-950/60 text-rose-400 border-slate-800 hover:border-slate-700"
-                    }`}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-                    <span>Risky ({counts.red})</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Individual Item Cards */}
-              <div className="space-y-2.5">
-                {filteredItems.map((item: ScannedItem, index: number) => {
-                  const isGreen = item.risk_category === "green";
-                  const isRed = item.risk_category === "red";
-
-                  return (
-                    <div
-                      key={index}
-                      className={`p-3.5 rounded-2xl border transition-all ${
-                        isGreen
-                          ? "bg-emerald-950/15 border-emerald-500/30"
-                          : isRed
-                          ? "bg-rose-950/15 border-rose-500/30"
-                          : "bg-amber-950/15 border-amber-500/30"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <span className="text-xs font-bold text-slate-100">
-                              {item.item_name}
-                            </span>
-                            <span
-                              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                                isGreen
-                                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
-                                  : isRed
-                                  ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
-                                  : "bg-amber-500/20 text-amber-300 border-amber-500/40"
-                              }`}
-                            >
-                              {isGreen ? "Safe / Low GI" : isRed ? "High Spike Risk" : "Moderate / Caution"}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-400 mt-0.5">
-                            {item.quantity_estimate}
-                          </p>
-                        </div>
-
-                        {/* GI / GL Badges */}
-                        <div className="flex items-center space-x-1.5 shrink-0">
-                          <div className="px-2 py-1 rounded-lg bg-slate-900 border border-slate-800 text-center">
-                            <div className="text-[9px] text-slate-400">GI</div>
-                            <div className={`text-xs font-bold ${isRed ? "text-rose-400" : isGreen ? "text-emerald-400" : "text-amber-400"}`}>
-                              {item.glycemic_index}
-                            </div>
-                          </div>
-                          <div className="px-2 py-1 rounded-lg bg-slate-900 border border-slate-800 text-center">
-                            <div className="text-[9px] text-slate-400">GL</div>
-                            <div className={`text-xs font-bold ${isRed ? "text-rose-400" : isGreen ? "text-emerald-400" : "text-amber-400"}`}>
-                              {item.glycemic_load}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Macros row */}
-                      <div className="flex items-center space-x-3 text-[11px] text-slate-300 mt-2 pt-2 border-t border-slate-800/60">
-                        <span>Net Carbs: <strong>{item.net_carbs_g}g</strong></span>
-                        <span>•</span>
-                        <span>Dietary Fiber: <strong>{item.fiber_g}g</strong></span>
-                      </div>
-
-                      {/* Clinical Rationale & Pairing Advice */}
-                      <div className="mt-2.5 space-y-1.5 text-[11px]">
-                        <p className="text-slate-300 leading-relaxed">
-                          <strong className="text-slate-200">Clinical Impact:</strong> {item.clinical_rationale}
-                        </p>
-                        <div className="p-2 rounded-xl bg-slate-900/60 border border-slate-800 text-slate-300">
-                          <strong className="text-emerald-400">Pairing Advice:</strong> {item.pairing_advice}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Basket Overview */}
-              <div className="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1.5 text-xs text-slate-300">
-                <div className="font-semibold text-slate-200 flex items-center space-x-1.5">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                  <span>Overall Basket Clinical Assessment</span>
-                </div>
-                <p className="text-[11px] text-slate-300 leading-relaxed">
-                  {scanResult.overall_basket_assessment}
-                </p>
-
-                {scanResult.missing_vital_buffers.length > 0 && (
-                  <div className="mt-2 pt-2 border-t border-slate-800 text-[11px]">
-                    <span className="text-amber-400 font-medium">Recommended Missing Buffers: </span>
-                    <span className="text-slate-400">
-                      {scanResult.missing_vital_buffers.join(", ")}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Forward Action to Phase 3 */}
-              <div className="pt-2">
-                <Link
-                  href={`/recipes?items=${encodeURIComponent(
-                    scanResult.scanned_items.map((i) => i.item_name).join(",")
-                  )}`}
-                  onClick={() => {
-                    if (typeof window !== "undefined") {
-                      sessionStorage.setItem(
-                        "glucovision_scanned_items",
-                        JSON.stringify(scanResult.scanned_items.map((i) => i.item_name))
-                      );
-                    }
-                  }}
-                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 text-xs font-bold hover:brightness-110 shadow-lg shadow-emerald-500/25 flex items-center justify-center space-x-2 transition-all active:scale-95"
-                >
-                  <ChefHat className="w-4 h-4" />
-                  <span>Generate Low-GI Sequenced Recipe (Phase 3)</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              </div>
-            </div>
           )}
+
+          <button type="button" onClick={handleLoadPreset} disabled={isScanning} className="btn-secondary">
+            <Sparkles className="h-5 w-5 text-pastel-peach-strong" />
+            Try a sample basket
+          </button>
         </div>
 
-        {/* Footer */}
-        <footer className="p-3.5 border-t border-slate-800/60 bg-slate-950/70 flex items-center justify-between text-xs text-slate-500">
-          <Link href="/" className="hover:text-slate-300">
-            System Dashboard
-          </Link>
-          <span className="text-emerald-400 font-medium">Phase 2 Operational</span>
-        </footer>
-      </div>
-    </main>
+        {/* Scan Results */}
+        {scanResult && (
+          <section className="space-y-4 pt-1">
+            <div className="space-y-3">
+              <h2 className="text-lg font-extrabold text-ink">
+                Found {scanResult.scanned_items.length} item{scanResult.scanned_items.length === 1 ? "" : "s"}
+              </h2>
+
+              {/* Filter chips */}
+              <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+                {filters.map((f) => (
+                  <button
+                    key={f.key}
+                    onClick={() => setFilterCategory(f.key)}
+                    aria-pressed={filterCategory === f.key}
+                    className="chip-toggle shrink-0"
+                  >
+                    {f.dot && <span className={`h-2.5 w-2.5 rounded-full ${f.dot}`} />}
+                    {f.label} ({f.count})
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Item Cards */}
+            <div className="space-y-3">
+              {filteredItems.map((item: ScannedItem, index: number) => {
+                const isGreen = item.risk_category === "green";
+                const isRed = item.risk_category === "red";
+                const riskBg = isRed ? "bg-risk-danger" : isGreen ? "bg-risk-safe" : "bg-risk-caution";
+                const riskInk = isRed ? "text-risk-dangerInk" : isGreen ? "text-risk-safeInk" : "text-risk-cautionInk";
+                const RiskIcon = isRed ? AlertTriangle : isGreen ? CircleCheck : CircleAlert;
+
+                return (
+                  <div key={index} className="card p-4">
+                    <div className="flex items-center gap-3">
+                      <span className={`icon-badge ${riskBg} ${riskInk}`}>
+                        <RiskIcon className="h-5 w-5" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-base font-bold text-ink">{item.item_name}</p>
+                        <p className="truncate text-sm text-ink-muted">{item.quantity_estimate}</p>
+                      </div>
+                      <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${riskBg} ${riskInk}`}>
+                        {isGreen ? "Safe · Low GI" : isRed ? "High spike risk" : "Eat with caution"}
+                      </span>
+                    </div>
+
+                    {/* GI / GL / macros */}
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold">
+                      <span className="rounded-full bg-pastel-blue px-3 py-1 text-pastel-blue-ink">GI {item.glycemic_index}</span>
+                      <span className="rounded-full bg-pastel-lilac px-3 py-1 text-pastel-lilac-ink">GL {item.glycemic_load}</span>
+                      <span className="rounded-full bg-canvas px-3 py-1 text-ink-soft">Net carbs {item.net_carbs_g}g</span>
+                      <span className="rounded-full bg-canvas px-3 py-1 text-ink-soft">Fiber {item.fiber_g}g</span>
+                    </div>
+
+                    <p className="mt-3 text-sm leading-relaxed text-ink-soft">{item.clinical_rationale}</p>
+                    <div className="mt-3 rounded-2xl bg-pastel-lime/60 p-3 text-sm text-pastel-lime-ink">
+                      <strong>Pair it with: </strong>
+                      {item.pairing_advice}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Basket Overview */}
+            <div className="card space-y-2 p-4">
+              <div className="flex items-center gap-3">
+                <span className="icon-badge bg-pastel-blue text-pastel-blue-ink">
+                  <ShieldCheck className="h-5 w-5" />
+                </span>
+                <p className="font-bold text-ink">Your basket overall</p>
+              </div>
+              <p className="text-sm leading-relaxed text-ink-soft">{scanResult.overall_basket_assessment}</p>
+
+              {scanResult.missing_vital_buffers.length > 0 && (
+                <p className="border-t border-line pt-2 text-sm text-ink-soft">
+                  <span className="font-bold text-pastel-peach-ink">Consider adding: </span>
+                  {scanResult.missing_vital_buffers.join(", ")}
+                </p>
+              )}
+            </div>
+
+            {/* Forward to recipes */}
+            <Link
+              href={`/recipes?items=${encodeURIComponent(
+                scanResult.scanned_items.map((i) => i.item_name).join(",")
+              )}`}
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  sessionStorage.setItem(
+                    "glucovision_scanned_items",
+                    JSON.stringify(scanResult.scanned_items.map((i) => i.item_name))
+                  );
+                }
+              }}
+              className="btn-primary"
+            >
+              <ChefHat className="h-5 w-5" />
+              Make a recipe with these
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </section>
+        )}
+      </main>
+    </>
   );
 }

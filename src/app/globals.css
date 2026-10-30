@@ -3,10 +3,8 @@
 @tailwind utilities;
 
 :root {
-  --background: #090d16;
-  --foreground: #f8fafc;
-  --card: #0f172a;
-  --card-border: rgba(255, 255, 255, 0.08);
+  --background: #f5f4ed;
+  --foreground: #1f2328;
 }
 
 @layer base {
@@ -15,42 +13,79 @@
   }
   body {
     color: var(--foreground);
-    background-color: var(--background);
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
     overflow-x: hidden;
   }
 }
 
-/* Glassmorphism & Micro-animations */
-.glass-panel {
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+/*
+ * Shared UI primitives — use these instead of re-deriving styles per page.
+ * Tiles: `tile bg-pastel-blue text-pastel-blue-ink` + `fab bg-pastel-blue-strong`.
+ */
+@layer components {
+  .card {
+    @apply rounded-3xl bg-white shadow-soft;
+  }
+  .tile {
+    @apply relative overflow-hidden rounded-[28px] p-4;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-white/85 px-3 py-1.5 text-sm font-semibold text-ink shadow-sm;
+  }
+  .chip-toggle {
+    @apply inline-flex h-10 items-center gap-1.5 rounded-full border border-line bg-white px-4 text-sm font-semibold text-ink-soft transition-colors active:bg-canvas;
+  }
+  .chip-toggle[aria-pressed="true"],
+  .chip-toggle[aria-selected="true"] {
+    @apply border-ink bg-ink text-white;
+  }
+  .fab {
+    @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white shadow-sm transition-transform active:scale-95;
+  }
+  .btn-primary {
+    @apply flex h-12 w-full items-center justify-center gap-2 rounded-full bg-ink px-5 text-base font-bold text-white transition-colors active:bg-black disabled:opacity-40;
+  }
+  .btn-secondary {
+    @apply flex h-12 w-full items-center justify-center gap-2 rounded-full border border-line bg-white px-5 text-base font-bold text-ink transition-colors active:bg-canvas disabled:opacity-40;
+  }
+  .input {
+    @apply h-12 w-full rounded-2xl border border-line bg-white px-4 text-base text-ink placeholder:text-ink-muted focus:border-pastel-blue-strong focus:outline-none focus:ring-2 focus:ring-pastel-blue;
+  }
+  .section-title {
+    @apply text-sm font-bold text-ink-muted;
+  }
+  .icon-badge {
+    @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-full;
+  }
 }
 
-.glass-panel-elevated {
-  background: rgba(30, 41, 59, 0.65);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(5, 150, 105, 0.25);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+/* Enter animations (subset of tailwindcss-animate's API used by sheets & toasts) */
+@keyframes gv-enter {
+  from {
+    opacity: var(--gv-enter-opacity, 1);
+    transform: translate3d(0, var(--gv-enter-translate-y, 0), 0);
+  }
+}
+.animate-in {
+  animation: gv-enter 250ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+.fade-in {
+  --gv-enter-opacity: 0;
+}
+.slide-in-from-bottom {
+  --gv-enter-translate-y: 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-in {
+    animation: none;
+  }
 }
 
-/* Custom Scrollbar for Mobile-feel */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 9999px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
+.no-scrollbar {
+  scrollbar-width: none;
 }

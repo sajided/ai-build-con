@@ -55,9 +55,9 @@ describe("Phase 0 Test Suite: Scaffolding, PWA & Environment Verification", () =
       expect(fs.existsSync(layoutPath)).toBe(true);
 
       const layoutContent = fs.readFileSync(layoutPath, "utf-8");
-      // Must contain user-scalable=no and maximum-scale=1
-      expect(layoutContent).toContain('user-scalable=no');
-      expect(layoutContent).toContain('maximum-scale=1');
+      // Viewport export must lock zoom (maximumScale 1, userScalable false)
+      expect(layoutContent).toContain('userScalable: false');
+      expect(layoutContent).toContain('maximumScale: 1');
       expect(layoutContent).toContain('#059669');
     });
   });

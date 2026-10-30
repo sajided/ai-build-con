@@ -1,338 +1,392 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { Mic, Square, Loader2, Camera, Salad, Droplet, Keyboard, Volume2, Phone, Settings, LayoutGrid } from "lucide-react";
+import type { GlucoseLog, MeasurementContext } from "@/lib/validations/telemetry";
+import type { AssistantResult } from "@/lib/ai/elder-assistant";
 import {
-  Activity,
-  ShieldCheck,
-  Camera,
-  ChefHat,
-  Utensils,
-  LineChart,
-  ShoppingBag,
-  CheckCircle2,
-  Sparkles,
-  Cpu,
-  Layers,
-  ArrowRight,
-  Database,
-  Smartphone,
-  Flame,
-} from "lucide-react";
+  CONTEXT_LABELS_BN,
+  LEVEL_LABELS_BN,
+  classifyGlucose,
+  greetingBn,
+  readingFeedbackBn,
+  toBanglaDigits,
+} from "@/lib/assistant/bangla";
+import {
+  type ElderSettings,
+  type Recording,
+  compressImage,
+  loadLogs,
+  loadSettings,
+  saveGlucoseReading,
+  saveSettings,
+  speak,
+  startRecording,
+  stopSpeaking,
+  warmUpVoices,
+} from "@/lib/assistant/client";
+import ElderSetup from "@/components/elder/ElderSetup";
+import ConfirmReadingSheet from "@/components/elder/ConfirmReadingSheet";
+import NumberEntrySheet from "@/components/elder/NumberEntrySheet";
+import HelpScreen, { type HelpKind } from "@/components/elder/HelpScreen";
 
-interface PhaseCard {
-  phase: string;
-  module: string;
-  description: string;
-  testFocus: string;
-  status: "Completed" | "Next Up" | "Planned";
-  icon: React.ReactNode;
+const MAX_RECORDING_MS = 15000;
+
+type Phase = "idle" | "recording" | "thinking";
+type Verdict = "good" | "limit" | "avoid";
+
+const VERDICT_STYLES: Record<Verdict, { label: string; className: string }> = {
+  good: { label: "ভালো", className: "bg-risk-safe text-risk-safeInk" },
+  limit: { label: "অল্প খান", className: "bg-risk-caution text-risk-cautionInk" },
+  avoid: { label: "এড়িয়ে চলুন", className: "bg-risk-danger text-risk-dangerInk" },
+};
+
+const LEVEL_STYLES = {
+  low: "bg-risk-danger text-risk-dangerInk",
+  good: "bg-risk-safe text-risk-safeInk",
+  slightly_high: "bg-risk-caution text-risk-cautionInk",
+  high: "bg-risk-danger text-risk-dangerInk",
+  very_high: "bg-risk-danger text-risk-dangerInk",
+};
+
+function formatWhen(iso: string) {
+  const d = new Date(iso);
+  const time = d.toLocaleTimeString("bn-BD", { hour: "numeric", minute: "2-digit" });
+  if (d.toDateString() === new Date().toDateString()) return `আজ ${time}`;
+  return `${d.toLocaleDateString("bn-BD", { day: "numeric", month: "long" })}, ${time}`;
 }
 
-export default function HomePage() {
-  const [selectedPhase, setSelectedPhase] = useState<string>("Phase 0");
-  const [isCopied, setIsCopied] = useState<boolean>(false);
+export default function ElderHomePage() {
+  const [mounted, setMounted] = useState(false);
+  const [settings, setSettings] = useState<ElderSettings | null>(null);
+  const [editingSettings, setEditingSettings] = useState(false);
+  const [logs, setLogs] = useState<GlucoseLog[]>([]);
+  const [greeting, setGreeting] = useState("");
 
-  const phases: PhaseCard[] = [
-    {
-      phase: "Phase 0",
-      module: "Project Scaffold & PWA",
-      description: "Next.js 14 App Router, Emerald design system, PWA manifest & Vitest test suite.",
-      testFocus: "Build integrity, strict mobile viewport, env bindings",
-      status: "Completed",
-      icon: <Layers className="w-5 h-5 text-emerald-400" />,
-    },
-    {
-      phase: "Phase 1",
-      module: "Schema, RLS & Onboarding",
-      description: "PostgreSQL clinical profile tables, Row-Level Security & 3-step onboarding.",
-      testFocus: "Cross-user data isolation, mandatory disclaimer guard",
-      status: "Completed",
-      icon: <ShieldCheck className="w-5 h-5 text-emerald-300" />,
-    },
-    {
-      phase: "Phase 2",
-      module: "Bazaar Vision Risk Scanner",
-      description: "Multimodal Gemini extraction pipeline for raw bazaar groceries and traffic-light GI/GL grading.",
-      testFocus: "Latency ≤ 4.5s, strict JSON schema validation",
-      status: "Completed",
-      icon: <Camera className="w-5 h-5 text-amber-400" />,
-    },
-    {
-      phase: "Phase 3",
-      module: "Recipe Synthesis & Sequencer",
-      description: "Zero-hallucination carb generator + 3-tier clinical eating sequence (Fiber -> Protein -> Starch).",
-      testFocus: "Zero unphotographed high-carb hallucinations",
-      status: "Completed",
-      icon: <ChefHat className="w-5 h-5 text-emerald-400" />,
-    },
-    {
-      phase: "Phase 4",
-      module: "MenuSafe Auditor",
-      description: "OCR & Vision menu trap detector + localized waiter modification scripts.",
-      testFocus: "Hidden cornstarch/sugar detection, 1-click clipboard copy",
-      status: "Completed",
-      icon: <Utensils className="w-5 h-5 text-emerald-400" />,
-    },
-    {
-      phase: "Phase 5",
-      module: "Glucose Telemetry & Chart",
-      description: "Dual-trajectory Recharts visualization (Actual vs Predicted Target) with eHbA1c & TIR math.",
-      testFocus: "Clinical mathematical precision on eAG & TIR formulas",
-      status: "Completed",
-      icon: <LineChart className="w-5 h-5 text-emerald-400" />,
-    },
-    {
-      phase: "Phase 6",
-      module: "Nutritional Gap Engine",
-      description: "7-day fiber/micronutrient deficit tracking & local grocery buffer additions.",
-      testFocus: "Accurate deficit deltas, local staple shopping cart state",
-      status: "Completed",
-      icon: <ShoppingBag className="w-5 h-5 text-emerald-400" />,
-    },
-    {
-      phase: "Phase 7",
-      module: "Safety Guardrails & QA",
-      description: "Hard insulin calculation refusal guardrail + Lighthouse PWA production audit.",
-      testFocus: "100% hard block on prescription dosing queries",
-      status: "Completed",
-      icon: <Flame className="w-5 h-5 text-emerald-400" />,
-    },
-  ];
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [reply, setReply] = useState<{ text: string; verdict?: Verdict | null } | null>(null);
+  const [pending, setPending] = useState<{ value: number; context: MeasurementContext } | null>(null);
+  const [help, setHelp] = useState<{ kind: HelpKind; message: string } | null>(null);
+  const [numberEntry, setNumberEntry] = useState(false);
 
-  const handleCopyEnvPrompt = () => {
-    navigator.clipboard.writeText("npm test && npm run build");
-    setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2000);
+  const recordingRef = useRef<Recording | null>(null);
+  const meterInputRef = useRef<HTMLInputElement>(null);
+  const foodInputRef = useRef<HTMLInputElement>(null);
+
+  // Everything here depends on the browser (storage, locale, clock), so load after mount
+  useEffect(() => {
+    setSettings(loadSettings());
+    setLogs(loadLogs());
+    setGreeting(greetingBn(new Date().getHours()));
+    warmUpVoices();
+    setMounted(true);
+    return () => {
+      recordingRef.current?.cancel();
+      stopSpeaking();
+    };
+  }, []);
+
+  const say = useCallback((text: string, verdict?: Verdict | null) => {
+    setReply({ text, verdict });
+    speak(text);
+  }, []);
+
+  const handleResult = useCallback(
+    (result: AssistantResult) => {
+      if (result.action === "log_glucose" && result.glucose_value) {
+        const context = result.glucose_context ?? "random";
+        setPending({ value: result.glucose_value, context });
+        setReply(null);
+        speak(`${toBanglaDigits(result.glucose_value)}, ${CONTEXT_LABELS_BN[context]}। ঠিক আছে?`);
+        return;
+      }
+      if (result.action === "call_for_help") {
+        setHelp({ kind: "symptoms", message: result.reply });
+        speak(result.reply);
+        return;
+      }
+      say(result.reply, result.food_verdict);
+    },
+    [say]
+  );
+
+  const ask = useCallback(
+    async (mode: "talk" | "meter" | "food", payload: { audio?: Blob; image?: Blob }) => {
+      if (!navigator.onLine) {
+        say("ইন্টারনেট নেই। সুগার নিজে লিখতে নিচের বোতাম চাপুন।");
+        return;
+      }
+      setPhase("thinking");
+      setReply(null);
+      try {
+        const form = new FormData();
+        form.append("mode", mode);
+        if (settings?.name) form.append("name", settings.name);
+        if (payload.audio) form.append("audio", payload.audio, "speech");
+        if (payload.image) form.append("image", payload.image, "photo.jpg");
+        const res = await fetch("/api/assistant", { method: "POST", body: form });
+        const json = await res.json();
+        if (!res.ok || !json.success) throw new Error(json.error);
+        handleResult(json.data as AssistantResult);
+      } catch {
+        say("সংযোগে সমস্যা হয়েছে। আবার চেষ্টা করুন।");
+      } finally {
+        setPhase("idle");
+      }
+    },
+    [handleResult, say, settings?.name]
+  );
+
+  const finishRecording = useCallback(async () => {
+    const recording = recordingRef.current;
+    if (!recording) return;
+    recordingRef.current = null;
+    const blob = await recording.stop();
+    setPhase("idle");
+    if (blob.size < 1500) {
+      say("কিছু শুনতে পাইনি। বড় বোতাম চেপে আবার বলুন।");
+      return;
+    }
+    ask("talk", { audio: blob });
+  }, [ask, say]);
+
+  const toggleMic = async () => {
+    if (phase === "recording") return finishRecording();
+    if (phase === "thinking") return;
+    stopSpeaking();
+    setReply(null);
+    try {
+      recordingRef.current = await startRecording(MAX_RECORDING_MS, finishRecording);
+      setPhase("recording");
+    } catch {
+      say("মাইক্রোফোন চালু করা যায়নি। ফোনের সেটিংসে মাইক্রোফোনের অনুমতি দিন।");
+    }
   };
 
+  const onPhoto = (mode: "meter" | "food") => async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    stopSpeaking();
+    ask(mode, { image: await compressImage(file) });
+  };
+
+  const confirmReading = () => {
+    if (!pending) return;
+    saveGlucoseReading(pending.value, pending.context);
+    setLogs(loadLogs());
+    const feedback = readingFeedbackBn(pending.value);
+    const level = classifyGlucose(pending.value);
+    setPending(null);
+    if (level === "low" || level === "very_high") {
+      setHelp({ kind: level, message: feedback });
+      speak(feedback);
+    } else {
+      say(feedback);
+    }
+  };
+
+  const rejectReading = () => {
+    setPending(null);
+    say("ঠিক আছে, রাখলাম না। সংখ্যাটি আবার বলুন বা নিজে লিখুন।");
+  };
+
+  if (!mounted) return <main className="min-h-dvh" />;
+
+  if (!settings || editingSettings) {
+    return (
+      <ElderSetup
+        initial={settings}
+        onCancel={settings ? () => setEditingSettings(false) : undefined}
+        onDone={(s) => {
+          saveSettings(s);
+          setSettings(s);
+          setEditingSettings(false);
+          say(`ধন্যবাদ, ${s.name}। কথা বলতে বড় কালো বোতামটি চাপুন।`);
+        }}
+      />
+    );
+  }
+
+  const latest = [...logs].sort((a, b) => new Date(b.measured_at).getTime() - new Date(a.measured_at).getTime())[0];
+  const latestLevel = latest ? classifyGlucose(latest.glucose_value) : null;
+  const welcome = `${greeting}, ${settings.name}। কথা বলতে বড় কালো বোতামটি চাপুন।`;
+
   return (
-    <main className="min-h-screen bg-[#070b12] text-slate-100 flex items-center justify-center p-3 sm:p-6 lg:p-8">
-      {/* Mobile-first Preview Container */}
-      <div className="w-full max-w-md sm:max-w-2xl bg-gradient-to-b from-[#0c1322] to-[#070b14] rounded-3xl border border-slate-800/80 shadow-2xl overflow-hidden backdrop-blur-xl relative flex flex-col">
-        {/* Glow ambient header decoration */}
-        <div className="absolute top-0 inset-x-0 h-40 bg-gradient-to-b from-emerald-500/15 via-emerald-600/5 to-transparent pointer-events-none" />
+    <main lang="bn" className="flex min-h-dvh flex-col px-5 pt-[calc(env(safe-area-inset-top)+1.5rem)] pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
+      {/* Greeting + quick call */}
+      <header className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-lg font-semibold text-ink-soft">{greeting},</p>
+          <h1 className="text-3xl font-bold text-ink">{settings.name}</h1>
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => say(welcome)}
+            aria-label="শুনুন"
+            className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-ink shadow-soft active:bg-canvas"
+          >
+            <Volume2 className="h-6 w-6" />
+          </button>
+          {settings.contactPhone && (
+            <a
+              href={`tel:${settings.contactPhone}`}
+              aria-label={`${settings.contactName ?? "পরিবার"}-কে ফোন করুন`}
+              className="flex h-14 w-14 items-center justify-center rounded-full bg-pastel-lime-strong text-white shadow-soft active:scale-95"
+            >
+              <Phone className="h-6 w-6" />
+            </a>
+          )}
+        </div>
+      </header>
 
-        {/* Top App Header */}
-        <header className="px-5 pt-6 pb-4 relative z-10 flex items-center justify-between border-b border-slate-800/60">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-emerald-400 flex items-center justify-center shadow-lg shadow-emerald-500/25">
-              <Activity className="w-5 h-5 text-slate-950 stroke-[2.5]" />
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <h1 className="text-xl font-bold tracking-tight text-white font-heading">
-                  GlucoVision
-                </h1>
-                <span className="px-2 py-0.5 text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 rounded-full">
-                  v1.0 Production Ready
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 font-medium">
-                AI Metabolic & Diabetic Lifestyle Companion
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-slate-900/80 border border-slate-700/50 text-[11px] text-emerald-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-mono font-medium">All 8 Phases Complete</span>
-          </div>
-        </header>
-
-        {/* Content Area */}
-        <div className="p-5 space-y-5 relative z-10 overflow-y-auto max-h-[85vh]">
-          {/* Phase 7 Status Banner */}
-          <div className="glass-panel-elevated rounded-2xl p-4.5 border border-emerald-500/30 bg-emerald-950/20 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2 text-emerald-400">
-                <CheckCircle2 className="w-5 h-5" />
-                <span className="text-sm font-semibold tracking-wide">
-                  Clinical Safety Guardrail & PWA Complete
-                </span>
-              </div>
-              <span className="text-[11px] text-emerald-300 font-mono font-bold bg-emerald-500/20 px-2 py-0.5 rounded-full border border-emerald-500/30">
-                100% Passed
+      {/* Last reading */}
+      <section className="card mt-5 flex items-center gap-4 p-5">
+        <div className="icon-badge h-14 w-14 bg-pastel-blue text-pastel-blue-ink">
+          <Droplet className="h-7 w-7" />
+        </div>
+        {latest && latestLevel ? (
+          <div className="min-w-0 flex-1">
+            <p className="text-base font-semibold text-ink-muted">শেষ সুগার · {formatWhen(latest.measured_at)}</p>
+            <div className="mt-0.5 flex flex-wrap items-center gap-2">
+              <span className="text-4xl font-bold text-ink">{toBanglaDigits(latest.glucose_value)}</span>
+              <span className={`rounded-full px-3 py-1 text-base font-bold ${LEVEL_STYLES[latestLevel]}`}>
+                {LEVEL_LABELS_BN[latestLevel]}
               </span>
             </div>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              TC-P7-01 medical safety guardrail strictly intercepts 100% of unauthorized insulin dosing calculations and prescription alterations. Full PWA offline caching and complete test suite verified.
-            </p>
-
-            <div className="flex flex-wrap gap-2 pt-1">
-              <Link
-                href="/safety"
-                className="text-xs font-semibold px-3.5 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-rose-500 text-white shadow-md shadow-rose-950/30 hover:brightness-110 transition-all flex items-center space-x-1.5 active:scale-95"
-              >
-                <span>Safety Guardrail Sandbox</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-
-              <Link
-                href="/deficits"
-                className="text-xs font-medium px-3.5 py-2 rounded-xl bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-750 transition-all flex items-center space-x-1.5 active:scale-95"
-              >
-                <ShoppingBag className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Bazaar Gap Engine</span>
-              </Link>
-
-              <Link
-                href="/telemetry"
-                className="text-xs font-medium px-3.5 py-2 rounded-xl bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-750 transition-all flex items-center space-x-1.5 active:scale-95"
-              >
-                <LineChart className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Telemetry</span>
-              </Link>
-
-              <button
-                onClick={handleCopyEnvPrompt}
-                className="text-[11px] font-medium px-3 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all flex items-center space-x-1.5 active:scale-95 ml-auto"
-              >
-                <span>{isCopied ? "Command Copied!" : "npm test"}</span>
-              </button>
-            </div>
           </div>
+        ) : (
+          <p className="text-lg font-semibold text-ink-soft">এখনো কোনো সুগার রাখা হয়নি। বোতাম চেপে বলুন বা মিটারের ছবি তুলুন।</p>
+        )}
+      </section>
 
-          {/* Real-Time Runtime Diagnostics */}
-          <div className="space-y-2.5">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center space-x-1.5 px-0.5">
-              <Cpu className="w-3.5 h-3.5 text-slate-400" />
-              <span>Core Dependency Matrix</span>
-            </h2>
+      {/* Big talk button */}
+      <section className="flex flex-1 flex-col items-center justify-center py-8">
+        <button
+          type="button"
+          onClick={toggleMic}
+          disabled={phase === "thinking"}
+          aria-label={phase === "recording" ? "বলা শেষ" : "কথা বলুন"}
+          className={`relative flex h-44 w-44 items-center justify-center rounded-full text-white shadow-float transition-transform active:scale-95 disabled:opacity-80 ${
+            phase === "recording" ? "bg-pastel-coral-strong" : "bg-ink"
+          }`}
+        >
+          {phase === "recording" && <span className="absolute inset-0 animate-ping rounded-full bg-pastel-coral-strong/40" />}
+          {phase === "thinking" ? (
+            <Loader2 className="h-16 w-16 animate-spin" />
+          ) : phase === "recording" ? (
+            <Square className="relative h-14 w-14 fill-current" />
+          ) : (
+            <Mic className="h-20 w-20" />
+          )}
+        </button>
+        <p className="mt-5 text-center text-2xl font-bold text-ink" aria-live="polite">
+          {phase === "recording" ? "শুনছি… বলা শেষ হলে আবার চাপুন" : phase === "thinking" ? "একটু অপেক্ষা করুন…" : "কথা বলুন"}
+        </p>
 
-            <div className="grid grid-cols-2 gap-2.5 text-xs">
-              <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 flex items-start space-x-2.5">
-                <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0 mt-0.5">
-                  <Database className="w-3.5 h-3.5 text-emerald-400" />
-                </div>
-                <div>
-                  <div className="font-medium text-slate-200">Supabase SSR</div>
-                  <div className="text-[11px] text-emerald-400 flex items-center space-x-1 mt-0.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                    <span>v2.118 SDK Bound</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 flex items-start space-x-2.5">
-                <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0 mt-0.5">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                </div>
-                <div>
-                  <div className="font-medium text-slate-200">Gemini 3.8 Flash</div>
-                  <div className="text-[11px] text-amber-400 flex items-center space-x-1 mt-0.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                    <span>Active & Verified</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 flex items-start space-x-2.5">
-                <div className="w-7 h-7 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center shrink-0 mt-0.5">
-                  <Smartphone className="w-3.5 h-3.5 text-cyan-400" />
-                </div>
-                <div>
-                  <div className="font-medium text-slate-200">PWA Manifest</div>
-                  <div className="text-[11px] text-cyan-400 flex items-center space-x-1 mt-0.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-                    <span>#059669 Standalone</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 flex items-start space-x-2.5">
-                <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0 mt-0.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
-                </div>
-                <div>
-                  <div className="font-medium text-slate-200">Test Harness</div>
-                  <div className="text-[11px] text-indigo-400 flex items-center space-x-1 mt-0.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
-                    <span>Vitest 46/46 Passed</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+        {reply && phase === "idle" && (
+          <div className="card mt-6 w-full p-5" aria-live="polite">
+            {reply.verdict && (
+              <span className={`mb-3 inline-block rounded-full px-4 py-1.5 text-lg font-bold ${VERDICT_STYLES[reply.verdict].className}`}>
+                {VERDICT_STYLES[reply.verdict].label}
+              </span>
+            )}
+            <p className="text-xl font-semibold leading-relaxed text-ink">{reply.text}</p>
+            <button
+              type="button"
+              onClick={() => speak(reply.text)}
+              className="mt-4 inline-flex h-12 items-center gap-2 rounded-full bg-canvas px-5 text-lg font-semibold text-ink active:bg-line"
+            >
+              <Volume2 className="h-5 w-5" />
+              আবার শুনুন
+            </button>
           </div>
+        )}
+      </section>
 
-          {/* Phase Roadmap Progression */}
-          <div className="space-y-3 pt-1">
-            <div className="flex items-center justify-between px-0.5">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center space-x-1.5">
-                <Layers className="w-3.5 h-3.5 text-slate-400" />
-                <span>Implementation Roadmap (8 Phases)</span>
-              </h2>
-              <span className="text-[11px] text-slate-500">6 of 8 Operational</span>
-            </div>
+      {/* Photo actions */}
+      <section className="grid grid-cols-2 gap-3">
+        <button
+          type="button"
+          disabled={phase !== "idle"}
+          onClick={() => meterInputRef.current?.click()}
+          className="tile flex min-h-[132px] flex-col items-start justify-between bg-pastel-blue text-left text-pastel-blue-ink active:opacity-80 disabled:opacity-60"
+        >
+          <span className="fab bg-pastel-blue-strong">
+            <Camera className="h-5 w-5" />
+          </span>
+          <span className="text-xl font-bold leading-snug">সুগার মিটারের ছবি</span>
+        </button>
+        <button
+          type="button"
+          disabled={phase !== "idle"}
+          onClick={() => foodInputRef.current?.click()}
+          className="tile flex min-h-[132px] flex-col items-start justify-between bg-pastel-lime text-left text-pastel-lime-ink active:opacity-80 disabled:opacity-60"
+        >
+          <span className="fab bg-pastel-lime-strong">
+            <Salad className="h-5 w-5" />
+          </span>
+          <span className="text-xl font-bold leading-snug">খাবারের ছবি</span>
+        </button>
+        <input ref={meterInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onPhoto("meter")} />
+        <input ref={foodInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onPhoto("food")} />
+      </section>
 
-            <div className="space-y-2">
-              {phases.map((p) => {
-                const isSelected = selectedPhase === p.phase;
-                return (
-                  <div
-                    key={p.phase}
-                    onClick={() => setSelectedPhase(p.phase)}
-                    className={`p-3.5 rounded-2xl transition-all cursor-pointer border ${
-                      isSelected
-                        ? "bg-slate-800/80 border-emerald-500/40 shadow-lg"
-                        : "bg-slate-900/40 border-slate-800/60 hover:bg-slate-850/60"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="p-2 rounded-xl bg-slate-800/80 border border-slate-700/50">
-                          {p.icon}
-                        </div>
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <span className="text-xs font-bold text-slate-200">
-                              {p.phase}: {p.module}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-400 mt-0.5">
-                            {p.description}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <span
-                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                            p.status === "Completed"
-                              ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-                              : p.status === "Next Up"
-                              ? "bg-amber-500/15 text-amber-400 border-amber-500/30 animate-pulse"
-                              : "bg-slate-800 text-slate-400 border-slate-700"
-                          }`}
-                        >
-                          {p.status}
-                        </span>
-                      </div>
-                    </div>
+      <button
+        type="button"
+        disabled={phase !== "idle"}
+        onClick={() => setNumberEntry(true)}
+        className="btn-secondary mt-3 h-16 text-xl"
+      >
+        <Keyboard className="h-6 w-6" />
+        সুগার নিজে লিখুন
+      </button>
 
-                    {isSelected && (
-                      <div className="mt-3 pt-3 border-t border-slate-700/40 text-[11px] flex items-center justify-between text-slate-300">
-                        <div className="flex items-center space-x-1.5 text-slate-400">
-                          <span className="font-semibold text-slate-300">Test Focus:</span>
-                          <span>{p.testFocus}</span>
-                        </div>
-                        <ArrowRight className="w-3.5 h-3.5 text-emerald-400" />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
+      <nav className="mt-5 flex items-center justify-between text-base font-semibold text-ink-muted">
+        <button type="button" onClick={() => setEditingSettings(true)} className="inline-flex h-12 items-center gap-2 px-1">
+          <Settings className="h-5 w-5" />
+          নাম ও ফোন নম্বর
+        </button>
+        <Link href="/dashboard" className="inline-flex h-12 items-center gap-2 px-1">
+          <LayoutGrid className="h-5 w-5" />
+          আরও
+        </Link>
+      </nav>
 
-        {/* Footer */}
-        <footer className="p-4 border-t border-slate-800/60 bg-slate-950/70 text-center text-xs text-slate-500">
-          <div className="flex items-center justify-center space-x-2">
-            <span>GlucoVision v1.0 MVP</span>
-            <span>•</span>
-            <span className="text-emerald-400 font-medium">Phase 5 Complete • Ready for Phase 6</span>
-          </div>
-        </footer>
-      </div>
+      {pending && (
+        <ConfirmReadingSheet
+          value={pending.value}
+          context={pending.context}
+          onContextChange={(context) => setPending({ ...pending, context })}
+          onConfirm={confirmReading}
+          onReject={rejectReading}
+        />
+      )}
+      {numberEntry && (
+        <NumberEntrySheet
+          onClose={() => setNumberEntry(false)}
+          onSubmit={(value) => {
+            setNumberEntry(false);
+            setPending({ value, context: "random" });
+            speak(`${toBanglaDigits(value)}। ঠিক আছে?`);
+          }}
+        />
+      )}
+      {help && (
+        <HelpScreen
+          kind={help.kind}
+          message={help.message}
+          contactName={settings.contactName}
+          contactPhone={settings.contactPhone}
+          onReplay={() => speak(help.message)}
+          onClose={() => {
+            stopSpeaking();
+            setHelp(null);
+          }}
+        />
+      )}
     </main>
   );
 }

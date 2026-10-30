@@ -113,7 +113,7 @@ export function useBazaarCart() {
 
   const getExportText = useCallback(() => {
     if (cart.length === 0) return 'Bazaar shopping list is empty.';
-    let text = '🛒 *GlucoVision Local Bazaar Shopping List*\n';
+    let text = '🛒 *Jotno Local Bazaar Shopping List*\n';
     text += 'Diabetic glycemic-buffering staples:\n\n';
     cart.forEach((ci) => {
       text += `• ${ci.item.name} (${ci.item.localNameBengali || ''}) - ${ci.quantity} ${ci.item.unit} (~$${(ci.item.pricePerUnit * ci.quantity).toFixed(2)})\n  _${ci.item.primaryNutrient}_\n`;

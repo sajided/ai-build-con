@@ -2,106 +2,79 @@
 
 import React from 'react';
 import { NutrientMetric } from '@/lib/validations/deficits';
-import { ShieldCheck, AlertTriangle, Activity } from 'lucide-react';
+import { Wheat, Atom, Beef, Leaf } from 'lucide-react';
+import ProgressRing from '@/components/app/ProgressRing';
 
 interface NutrientProgressMeterProps {
   metrics: NutrientMetric[];
 }
 
+// Per-nutrient pastel styling: icon badge fill, icon colour, ring colour (pastel "strong" hex values)
+const NUTRIENT_STYLE: Record<string, { badge: string; ring: string; icon: React.ElementType }> = {
+  fiber: { badge: 'bg-pastel-lime text-pastel-lime-ink', ring: '#9DB98C', icon: Wheat },
+  protein_carb: { badge: 'bg-pastel-blue text-pastel-blue-ink', ring: '#7FA7EE', icon: Beef },
+  magnesium: { badge: 'bg-pastel-lilac text-pastel-lilac-ink', ring: '#9F88EA', icon: Atom },
+};
+const DEFAULT_STYLE = { badge: 'bg-pastel-peach text-pastel-peach-ink', ring: '#E9A440', icon: Leaf };
+
 export function NutrientProgressMeter({ metrics }: NutrientProgressMeterProps) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {metrics.map((metric) => {
         const isOptimal = metric.status === 'optimal' || metric.status === 'surplus';
         const isCritical = metric.status === 'critical_deficit';
+        const style = NUTRIENT_STYLE[metric.id] ?? DEFAULT_STYLE;
+        const Icon = style.icon;
 
-        // Color classes
-        const barColor = isOptimal
-          ? 'bg-emerald-500'
+        const statusPill = isOptimal
+          ? 'bg-risk-safe text-risk-safeInk'
           : isCritical
-          ? 'bg-rose-500'
-          : 'bg-amber-500';
-
-        const textColor = isOptimal
-          ? 'text-emerald-400'
-          : isCritical
-          ? 'text-rose-400'
-          : 'text-amber-400';
-
-        const badgeBg = isOptimal
-          ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
-          : isCritical
-          ? 'bg-rose-500/10 text-rose-300 border-rose-500/30'
-          : 'bg-amber-500/10 text-amber-300 border-amber-500/30';
+          ? 'bg-risk-danger text-risk-dangerInk'
+          : 'bg-risk-caution text-risk-cautionInk';
 
         return (
-          <div
-            key={metric.id}
-            className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 shadow-lg backdrop-blur-md transition-all duration-200 hover:border-slate-700"
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                {isOptimal ? (
-                  <ShieldCheck className="h-5 w-5 text-emerald-400" />
-                ) : isCritical ? (
-                  <AlertTriangle className="h-5 w-5 text-rose-400" />
-                ) : (
-                  <Activity className="h-5 w-5 text-amber-400" />
-                )}
-                <span className="font-semibold text-slate-100 text-sm">
-                  {metric.name}
-                </span>
+          <div key={metric.id} className="card p-4">
+            {/* Goals-style row: icon badge, title + meta, ring */}
+            <div className="flex items-center gap-3">
+              <div className={`icon-badge ${style.badge}`}>
+                <Icon className="h-5 w-5" />
               </div>
 
-              {/* Status Badge */}
-              <div className="flex items-center gap-2">
-                {metric.badge && (
-                  <span
-                    data-testid={`${metric.id}-badge`}
-                    className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-bold tracking-wide shadow-sm animate-pulse ${badgeBg}`}
-                  >
-                    ★ {metric.badge}
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-base font-bold text-ink">{metric.name}</span>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${statusPill}`}>
+                    {isOptimal ? 'On track' : 'Low'}
                   </span>
-                )}
-                <span className={`text-xs font-semibold uppercase ${textColor}`}>
-                  {isOptimal ? 'Optimal' : 'Deficit'}
-                </span>
+                </div>
+                <p className="text-sm text-ink-muted">
+                  <strong className="font-bold text-ink-soft">
+                    {metric.current} {metric.unit}
+                  </strong>{' '}
+                  of {metric.target} {metric.unit} goal
+                </p>
               </div>
-            </div>
 
-            {/* Metrics values */}
-            <div className="flex items-baseline justify-between text-xs mb-1.5">
-              <span className="text-slate-400">
-                Current:{' '}
-                <strong className="text-slate-200 text-sm font-mono">
-                  {metric.current} {metric.unit}
-                </strong>
-              </span>
-              <span className="text-slate-400">
-                Target:{' '}
-                <span className="text-slate-300 font-mono">
-                  {metric.target} {metric.unit}
-                </span>
-                <span className={`ml-2 font-bold font-mono ${textColor}`}>
-                  ({metric.difference > 0 ? `+${metric.difference}` : metric.difference}
-                  {metric.unit})
-                </span>
-              </span>
-            </div>
-
-            {/* Horizontal Progress Bar */}
-            <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-slate-800">
-              <div
-                className={`h-full rounded-full transition-all duration-500 ease-out ${barColor}`}
-                style={{ width: `${Math.min(100, Math.max(8, metric.percentage))}%` }}
+              <ProgressRing
+                value={metric.percentage}
+                color={style.ring}
+                size={52}
+                stroke={7}
+                label={`${Math.round(Math.min(100, metric.percentage))}%`}
               />
             </div>
 
+            {metric.badge && (
+              <span
+                data-testid={`${metric.id}-badge`}
+                className="mt-3 inline-flex items-center gap-1 rounded-full bg-risk-safe px-2.5 py-1 text-xs font-bold text-risk-safeInk"
+              >
+                ★ {metric.badge}
+              </span>
+            )}
+
             {/* Clinical Mechanism Explanation */}
-            <p className="mt-2 text-xs leading-relaxed text-slate-400">
-              {metric.clinicalImpact}
-            </p>
+            <p className="mt-3 text-sm leading-relaxed text-ink-soft">{metric.clinicalImpact}</p>
           </div>
         );
       })}

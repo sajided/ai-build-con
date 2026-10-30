@@ -9,7 +9,7 @@ export interface UserSession {
 
 export const DEMO_USER: UserSession = {
   id: "00000000-0000-4000-8000-000000000001",
-  email: "demo.patient@glucovision.health",
+  email: "demo.patient@jotno.health",
   fullName: "Alex Rivera",
   isDemo: true,
 };

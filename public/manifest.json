@@ -1,6 +1,6 @@
 {
-  "name": "GlucoVision – AI Diabetic Nutrition & Metabolic Assistant",
-  "short_name": "GlucoVision",
+  "name": "Jotno – AI Diabetic Nutrition & Metabolic Assistant",
+  "short_name": "Jotno",
   "description": "AI-powered multimodal metabolic companion for diabetic and pre-diabetic patients.",
   "start_url": "/",
   "display": "standalone",

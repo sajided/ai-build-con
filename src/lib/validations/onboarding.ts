@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /**
- * Zod validation schema for GlucoVision Clinical Onboarding Flow.
+ * Zod validation schema for Jotno Clinical Onboarding Flow.
  * Strictly adheres to TC-P1-02 clinical bounds and legal disclaimer requirements.
  */
 export const onboardingSchema = z.object({

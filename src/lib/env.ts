@@ -1,5 +1,5 @@
 /**
- * GlucoVision Environment Configuration Helper
+ * Jotno Environment Configuration Helper
  * Provides typed access and validation status for core external services.
  */
 
