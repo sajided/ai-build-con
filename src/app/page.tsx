@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Mic, Square, Loader2, Camera, Salad, Droplet, Keyboard, Volume2, Phone, Settings, LayoutGrid } from "lucide-react";
+import { Mic, Square, Loader2, Camera, Salad, Droplet, Keyboard, Volume2, Phone, Settings, LayoutGrid, Pill, FileText } from "lucide-react";
 import type { GlucoseLog, MeasurementContext } from "@/lib/validations/telemetry";
 import type { AssistantResult } from "@/lib/ai/elder-assistant";
 import {
@@ -30,8 +30,23 @@ import ElderSetup from "@/components/elder/ElderSetup";
 import ConfirmReadingSheet from "@/components/elder/ConfirmReadingSheet";
 import NumberEntrySheet from "@/components/elder/NumberEntrySheet";
 import HelpScreen, { type HelpKind } from "@/components/elder/HelpScreen";
+import ReminderCard from "@/components/care/ReminderCard";
+import {
+  type DueReminder,
+  dueReminders,
+  loadDoses,
+  loadReminders,
+  loadSnoozes,
+  recordDose,
+  reminderSpeechBn,
+  reminderTitleBn,
+  slotKey,
+  snooze,
+} from "@/lib/care/reminders";
+import { alertMessageBn } from "@/lib/care/report";
 
 const MAX_RECORDING_MS = 15000;
+const REMINDER_CHECK_MS = 30000;
 
 type Phase = "idle" | "recording" | "thinking";
 type Verdict = "good" | "limit" | "avoid";
@@ -67,7 +82,9 @@ export default function ElderHomePage() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [reply, setReply] = useState<{ text: string; verdict?: Verdict | null } | null>(null);
   const [pending, setPending] = useState<{ value: number; context: MeasurementContext } | null>(null);
-  const [help, setHelp] = useState<{ kind: HelpKind; message: string } | null>(null);
+  const [help, setHelp] = useState<{ kind: HelpKind; message: string; alertText?: string } | null>(null);
+  const [due, setDue] = useState<DueReminder[]>([]);
+  const announcedRef = useRef<Set<string>>(new Set());
   const [numberEntry, setNumberEntry] = useState(false);
 
   const recordingRef = useRef<Recording | null>(null);
@@ -87,6 +104,51 @@ export default function ElderHomePage() {
     };
   }, []);
 
+  const refreshDue = useCallback(() => {
+    setDue(dueReminders(new Date(), loadReminders(), loadDoses(), loadSnoozes()));
+  }, []);
+
+  // Check reminders while the app is open; also re-check when the phone wakes the tab
+  useEffect(() => {
+    refreshDue();
+    const timer = setInterval(refreshDue, REMINDER_CHECK_MS);
+    const onVisible = () => document.visibilityState === "visible" && refreshDue();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [refreshDue]);
+
+  // Announce each reminder slot once: spoken aloud, plus a phone notification if allowed
+  const current = due[0];
+  useEffect(() => {
+    if (!current || !settings || phase !== "idle") return;
+    const key = slotKey(current.reminder.id, current.date, current.time);
+    if (announcedRef.current.has(key)) return;
+    announcedRef.current.add(key);
+    const text = reminderSpeechBn(current.reminder);
+    speak(text);
+    if (typeof Notification !== "undefined" && Notification.permission === "granted" && document.visibilityState !== "visible") {
+      navigator.serviceWorker?.ready
+        .then((reg) => reg.showNotification(reminderTitleBn(current.reminder), { body: text, tag: key, icon: "/icons/icon-192x192.png" }))
+        .catch(() => new Notification(reminderTitleBn(current.reminder), { body: text, tag: key }));
+    }
+  }, [current, phase, settings]);
+
+  const answerReminder = (status: "taken" | "later") => {
+    if (!current) return;
+    stopSpeaking();
+    if (status === "taken") {
+      recordDose({ reminderId: current.reminder.id, date: current.date, time: current.time, status: "taken", at: new Date().toISOString() });
+    } else {
+      snooze(slotKey(current.reminder.id, current.date, current.time));
+      // Speak again when the snooze ends
+      announcedRef.current.delete(slotKey(current.reminder.id, current.date, current.time));
+    }
+    refreshDue();
+  };
+
   const say = useCallback((text: string, verdict?: Verdict | null) => {
     setReply({ text, verdict });
     speak(text);
@@ -102,13 +164,17 @@ export default function ElderHomePage() {
         return;
       }
       if (result.action === "call_for_help") {
-        setHelp({ kind: "symptoms", message: result.reply });
+        setHelp({
+          kind: "symptoms",
+          message: result.reply,
+          alertText: `যত্ন অ্যাপ: ${settings?.name ?? "আপনার পরিবারের সদস্য"} অসুস্থ বোধ করছেন। দয়া করে এখনই খোঁজ নিন।`,
+        });
         speak(result.reply);
         return;
       }
       say(result.reply, result.food_verdict);
     },
-    [say]
+    [say, settings?.name]
   );
 
   const ask = useCallback(
@@ -180,7 +246,11 @@ export default function ElderHomePage() {
     const level = classifyGlucose(pending.value);
     setPending(null);
     if (level === "low" || level === "very_high") {
-      setHelp({ kind: level, message: feedback });
+      setHelp({
+        kind: level,
+        message: feedback,
+        alertText: alertMessageBn(settings?.name ?? "", pending.value, toBanglaDigits(pending.value)),
+      });
       speak(feedback);
     } else {
       say(feedback);
@@ -241,6 +311,10 @@ export default function ElderHomePage() {
           )}
         </div>
       </header>
+
+      {current && (
+        <ReminderCard due={current} onSpeak={speak} onDone={() => answerReminder("taken")} onLater={() => answerReminder("later")} />
+      )}
 
       {/* Last reading */}
       <section className="card mt-5 flex items-center gap-4 p-5">
@@ -344,6 +418,21 @@ export default function ElderHomePage() {
         সুগার নিজে লিখুন
       </button>
 
+      <section className="mt-3 grid grid-cols-2 gap-3">
+        <Link href="/reminders" className="card flex min-h-[88px] items-center gap-3 p-4 active:bg-canvas">
+          <span className="icon-badge h-12 w-12 bg-pastel-lilac text-pastel-lilac-ink">
+            <Pill className="h-6 w-6" />
+          </span>
+          <span className="text-lg font-bold leading-snug text-ink">ওষুধ ও মনে করানো</span>
+        </Link>
+        <Link href="/report" className="card flex min-h-[88px] items-center gap-3 p-4 active:bg-canvas">
+          <span className="icon-badge h-12 w-12 bg-pastel-peach text-pastel-peach-ink">
+            <FileText className="h-6 w-6" />
+          </span>
+          <span className="text-lg font-bold leading-snug text-ink">ডাক্তারের রিপোর্ট</span>
+        </Link>
+      </section>
+
       <nav className="mt-5 flex items-center justify-between text-base font-semibold text-ink-muted">
         <button type="button" onClick={() => setEditingSettings(true)} className="inline-flex h-12 items-center gap-2 px-1">
           <Settings className="h-5 w-5" />
@@ -380,6 +469,7 @@ export default function ElderHomePage() {
           message={help.message}
           contactName={settings.contactName}
           contactPhone={settings.contactPhone}
+          alertText={help.alertText}
           onReplay={() => speak(help.message)}
           onClose={() => {
             stopSpeaking();

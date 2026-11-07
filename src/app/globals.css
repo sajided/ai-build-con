@@ -38,7 +38,8 @@
     @apply inline-flex h-10 items-center gap-1.5 rounded-full border border-line bg-white px-4 text-sm font-semibold text-ink-soft transition-colors active:bg-canvas;
   }
   .chip-toggle[aria-pressed="true"],
-  .chip-toggle[aria-selected="true"] {
+  .chip-toggle[aria-selected="true"],
+  .chip-toggle[aria-checked="true"] {
     @apply border-ink bg-ink text-white;
   }
   .fab {
@@ -88,4 +89,19 @@
 }
 .no-scrollbar {
   scrollbar-width: none;
+}
+
+/* Doctor report printing: plain white pages, no app chrome */
+@media print {
+  @page {
+    margin: 14mm;
+  }
+  body {
+    background: #fff !important;
+  }
+  .card {
+    box-shadow: none !important;
+    border: 1px solid #e6e3d8;
+    break-inside: avoid;
+  }
 }
