@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, CheckCircle2, AlertTriangle, ShieldAlert } from "lucide-react";
+import { toBanglaDigits } from "@/lib/assistant/bangla";
 import {
   step1BiometricsSchema,
   step2ClinicalSchema,
@@ -11,11 +12,26 @@ import {
 } from "@/lib/validations/onboarding";
 
 const inputClass = "input";
-const labelClass = "mb-1.5 block text-sm font-bold text-ink-soft";
+const labelClass = "mb-1.5 block text-base font-bold text-ink-soft";
 
-function FieldError({ message }: { message?: string }) {
+// Plain Bangla messages shown per field; validation itself (and its English messages) is unchanged
+const FIELD_ERRORS_BN: Record<string, string> = {
+  fullName: "নাম অন্তত ২ অক্ষরের লিখুন।",
+  age: "সঠিক বয়স লিখুন (১ থেকে ১২০ বছর)।",
+  gender: "একটি বেছে নিন।",
+  heightCm: "উচ্চতা ৫০ থেকে ২৫০ সেমি-র মধ্যে লিখুন।",
+  currentWeightKg: "ওজন ২০ থেকে ৩০০ কেজির মধ্যে লিখুন।",
+  targetWeightKg: "লক্ষ্য ওজন ২০ থেকে ৩০০ কেজির মধ্যে লিখুন।",
+  diabetesType: "আপনার ডায়াবেটিসের ধরন বেছে নিন।",
+  medicationRegimen: "আপনি কী ওষুধ খান, বেছে নিন।",
+  baselineHba1c: "HbA1c ৪ থেকে ১৮-এর মধ্যে লিখুন।",
+  targetFastingGlucose: "লক্ষ্য ৫০ থেকে ৩০০ mg/dL-এর মধ্যে লিখুন।",
+  glucoseUnit: "একক বেছে নিন।",
+};
+
+function FieldError({ field, message }: { field: string; message?: string }) {
   if (!message) return null;
-  return <p className="mt-1.5 text-sm font-semibold text-risk-dangerInk">{message}</p>;
+  return <p className="mt-1.5 text-base font-semibold text-risk-dangerInk">{FIELD_ERRORS_BN[field] ?? message}</p>;
 }
 
 /** Large selectable option used for single-choice fields */
@@ -42,7 +58,7 @@ function OptionButton({
   );
 }
 
-const STEP_TITLES = ["About you", "Your health", "Before you start"];
+const STEP_TITLES = ["আপনার কথা", "আপনার স্বাস্থ্য", "শুরু করার আগে"];
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -163,7 +179,7 @@ export default function OnboardingPage() {
     // Disclaimer must be explicitly checked
     if (!formData.disclaimerAccepted) {
       setStepErrors({
-        disclaimerAccepted: "Please tick the box above to continue.",
+        disclaimerAccepted: "এগিয়ে যেতে উপরের ঘরে টিক দিন।",
       });
       return;
     }
@@ -195,7 +211,7 @@ export default function OnboardingPage() {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        setApiError(data.error || "Couldn't save your profile. Please try again.");
+        setApiError("আপনার তথ্য রাখা যায়নি। আবার চেষ্টা করুন।");
         setIsSubmitting(false);
         return;
       }
@@ -208,8 +224,8 @@ export default function OnboardingPage() {
       // The API still returns redirectUrl "/scanner" (TC-P1-02E); in the app shell we land on Home
       router.push("/dashboard");
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Network error";
-      setApiError(msg);
+      console.error("Onboarding submit failed", err);
+      setApiError("ইন্টারনেট সংযোগে সমস্যা হয়েছে। আবার চেষ্টা করুন।");
       setIsSubmitting(false);
     }
   };
@@ -217,7 +233,7 @@ export default function OnboardingPage() {
   const canSubmit = Boolean(formData.disclaimerAccepted) && !isSubmitting;
 
   return (
-    <form onSubmit={handleSubmit} className="flex min-h-dvh flex-col bg-canvas">
+    <form lang="bn" onSubmit={handleSubmit} className="flex min-h-dvh flex-col bg-canvas">
       {/* Top bar: back, progress */}
       <header className="sticky top-0 z-30 bg-canvas/90 backdrop-blur-xl pt-[env(safe-area-inset-top)]">
         <div className="flex h-16 items-center gap-2 px-4">
@@ -225,22 +241,22 @@ export default function OnboardingPage() {
             <button
               type="button"
               onClick={handleBack}
-              aria-label="Back"
-              className="-ml-2 flex h-10 w-10 items-center justify-center rounded-full text-ink active:bg-black/5"
+              aria-label="ফিরে যান"
+              className="-ml-2 flex h-12 w-12 items-center justify-center rounded-full text-ink active:bg-black/5"
             >
               <ChevronLeft className="h-6 w-6" />
             </button>
           ) : (
             <Link
               href="/dashboard"
-              aria-label="Back"
-              className="-ml-2 flex h-10 w-10 items-center justify-center rounded-full text-ink active:bg-black/5"
+              aria-label="ফিরে যান"
+              className="-ml-2 flex h-12 w-12 items-center justify-center rounded-full text-ink active:bg-black/5"
             >
               <ChevronLeft className="h-6 w-6" />
             </Link>
           )}
-          <p className="flex-1 text-center text-sm font-bold text-ink-muted">Step {currentStep} of 3</p>
-          <div className="w-10" />
+          <p className="flex-1 text-center text-base font-bold text-ink-muted">ধাপ {toBanglaDigits(currentStep)} / ৩</p>
+          <div className="w-12" />
         </div>
         <div className="grid grid-cols-3 gap-1.5 px-4 pb-3">
           {[1, 2, 3].map((n) => (
@@ -254,18 +270,18 @@ export default function OnboardingPage() {
 
       <main className="flex-1 space-y-6 px-4 py-5">
         <div>
-          <h1 className="text-2xl font-extrabold text-ink">
-            {currentStep === 1 ? (isEditing ? "Your profile" : "Welcome") : STEP_TITLES[currentStep - 1]}
+          <h1 className="text-3xl font-bold text-ink">
+            {currentStep === 1 ? (isEditing ? "আপনার তথ্য" : "স্বাগতম") : STEP_TITLES[currentStep - 1]}
           </h1>
-          <p className="mt-1 text-base text-ink-soft">
-            {currentStep === 1 && "Tell us a little about yourself so we can personalise your advice."}
-            {currentStep === 2 && "This helps us set realistic glucose targets for you."}
-            {currentStep === 3 && "One important note about how Jotno works."}
+          <p className="mt-1 text-lg text-ink-soft">
+            {currentStep === 1 && "নিজের সম্পর্কে একটু বলুন, তাহলে পরামর্শ আপনার মতো হবে।"}
+            {currentStep === 2 && "এতে আপনার জন্য ঠিকঠাক সুগারের লক্ষ্য ঠিক করা যাবে।"}
+            {currentStep === 3 && "যত্ন কীভাবে কাজ করে, সে বিষয়ে একটা জরুরি কথা।"}
           </p>
         </div>
 
         {apiError && (
-          <div className="flex items-start gap-2 rounded-2xl bg-risk-danger p-4 text-sm font-semibold text-risk-dangerInk">
+          <div className="flex items-start gap-2 rounded-2xl bg-risk-danger p-4 text-base font-semibold text-risk-dangerInk">
             <AlertTriangle className="h-5 w-5 shrink-0" />
             <span>{apiError}</span>
           </div>
@@ -275,21 +291,21 @@ export default function OnboardingPage() {
         {currentStep === 1 && (
           <div className="space-y-5">
             <div>
-              <label htmlFor="fullName" className={labelClass}>Full name</label>
+              <label htmlFor="fullName" className={labelClass}>পুরো নাম</label>
               <input
                 id="fullName"
                 type="text"
                 autoComplete="name"
                 value={formData.fullName || ""}
                 onChange={(e) => updateField("fullName", e.target.value)}
-                placeholder="Your name"
+                placeholder="আপনার নাম"
                 className={inputClass}
               />
-              <FieldError message={stepErrors.fullName} />
+              <FieldError field="fullName" message={stepErrors.fullName} />
             </div>
 
             <div>
-              <label htmlFor="age" className={labelClass}>Age</label>
+              <label htmlFor="age" className={labelClass}>বয়স (বছর)</label>
               <input
                 id="age"
                 type="number"
@@ -299,16 +315,16 @@ export default function OnboardingPage() {
                 placeholder="42"
                 className={inputClass}
               />
-              <FieldError message={stepErrors.age} />
+              <FieldError field="age" message={stepErrors.age} />
             </div>
 
             <div>
-              <span className={labelClass}>Gender</span>
+              <span className={labelClass}>লিঙ্গ</span>
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { id: "male", label: "Male" },
-                  { id: "female", label: "Female" },
-                  { id: "other", label: "Other" },
+                  { id: "male", label: "পুরুষ" },
+                  { id: "female", label: "মহিলা" },
+                  { id: "other", label: "অন্যান্য" },
                 ].map((item) => (
                   <OptionButton
                     key={item.id}
@@ -323,7 +339,7 @@ export default function OnboardingPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="heightCm" className={labelClass}>Height (cm)</label>
+                <label htmlFor="heightCm" className={labelClass}>উচ্চতা (সেমি)</label>
                 <input
                   id="heightCm"
                   type="number"
@@ -333,11 +349,11 @@ export default function OnboardingPage() {
                   placeholder="175"
                   className={inputClass}
                 />
-                <FieldError message={stepErrors.heightCm} />
+                <FieldError field="heightCm" message={stepErrors.heightCm} />
               </div>
 
               <div>
-                <label htmlFor="currentWeightKg" className={labelClass}>Weight (kg)</label>
+                <label htmlFor="currentWeightKg" className={labelClass}>ওজন (কেজি)</label>
                 <input
                   id="currentWeightKg"
                   type="number"
@@ -348,7 +364,7 @@ export default function OnboardingPage() {
                   placeholder="78"
                   className={inputClass}
                 />
-                <FieldError message={stepErrors.currentWeightKg} />
+                <FieldError field="currentWeightKg" message={stepErrors.currentWeightKg} />
               </div>
             </div>
           </div>
@@ -358,13 +374,13 @@ export default function OnboardingPage() {
         {currentStep === 2 && (
           <div className="space-y-6">
             <div>
-              <span className={labelClass}>Diagnosis</span>
+              <span className={labelClass}>কোন ধরনের ডায়াবেটিস</span>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { id: "type_2", label: "Type 2" },
-                  { id: "pre_diabetes", label: "Pre-diabetes" },
-                  { id: "type_1", label: "Type 1" },
-                  { id: "gestational", label: "Gestational" },
+                  { id: "type_2", label: "টাইপ ২" },
+                  { id: "pre_diabetes", label: "প্রি-ডায়াবেটিস (শুরুর দিকে)" },
+                  { id: "type_1", label: "টাইপ ১" },
+                  { id: "gestational", label: "গর্ভকালীন" },
                 ].map((item) => (
                   <OptionButton
                     key={item.id}
@@ -378,20 +394,20 @@ export default function OnboardingPage() {
             </div>
 
             <div>
-              <span className={labelClass}>Current medication</span>
+              <span className={labelClass}>এখন কী ওষুধ খান</span>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { id: "diet_only", label: "Diet & lifestyle only" },
-                  { id: "oral_meds", label: "Tablets (e.g. Metformin)" },
-                  { id: "insulin", label: "Insulin" },
-                  { id: "combination", label: "Tablets + insulin" },
+                  { id: "diet_only", label: "ওষুধ নেই, শুধু খাবার ও হাঁটা" },
+                  { id: "oral_meds", label: "ট্যাবলেট (যেমন মেটফরমিন)" },
+                  { id: "insulin", label: "ইনসুলিন" },
+                  { id: "combination", label: "ট্যাবলেট + ইনসুলিন" },
                 ].map((item) => (
                   <OptionButton
                     key={item.id}
                     selected={(formData.medicationRegimen || "oral_meds") === item.id}
                     onClick={() => updateField("medicationRegimen", item.id)}
                   >
-                    <span className="text-sm leading-snug">{item.label}</span>
+                    <span className="text-base leading-snug">{item.label}</span>
                   </OptionButton>
                 ))}
               </div>
@@ -399,7 +415,7 @@ export default function OnboardingPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="baselineHba1c" className={labelClass}>Latest HbA1c (%)</label>
+                <label htmlFor="baselineHba1c" className={labelClass}>শেষ HbA1c (%)</label>
                 <input
                   id="baselineHba1c"
                   type="number"
@@ -410,11 +426,12 @@ export default function OnboardingPage() {
                   placeholder="7.2"
                   className={inputClass}
                 />
-                <FieldError message={stepErrors.baselineHba1c} />
+                <FieldError field="baselineHba1c" message={stepErrors.baselineHba1c} />
+                <p className="mt-1.5 text-base text-ink-muted">৩ মাসের গড় সুগার পরীক্ষা</p>
               </div>
 
               <div>
-                <label htmlFor="targetFastingGlucose" className={labelClass}>Fasting target (mg/dL)</label>
+                <label htmlFor="targetFastingGlucose" className={labelClass}>খালি পেটে সুগারের লক্ষ্য (mg/dL)</label>
                 <input
                   id="targetFastingGlucose"
                   type="number"
@@ -424,6 +441,12 @@ export default function OnboardingPage() {
                   placeholder="110"
                   className={inputClass}
                 />
+                <FieldError field="targetFastingGlucose" message={stepErrors.targetFastingGlucose} />
+                {Number(formData.targetFastingGlucose) > 0 && (
+                  <p className="mt-1.5 text-base text-ink-muted">
+                    = {toBanglaDigits(Number((Number(formData.targetFastingGlucose) / 18).toFixed(1)))} mmol/L
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -433,15 +456,15 @@ export default function OnboardingPage() {
         {currentStep === 3 && (
           <div className="space-y-4">
             <div className="tile space-y-3 bg-pastel-peach p-5 text-base leading-relaxed text-pastel-peach-ink">
-              <span className="chip">
-                <ShieldAlert className="h-4 w-4" />
-                Jotno is not a doctor
+              <span className="chip text-base">
+                <ShieldAlert className="h-5 w-5" />
+                যত্ন ডাক্তার নয়
               </span>
               <p>
-                We help you understand food and spot patterns. We <strong>never</strong> calculate insulin doses,
-                change your medication, or make a diagnosis.
+                আমরা খাবার বুঝতে আর সুগারের ধরন খেয়াল করতে সাহায্য করি। আমরা <strong>কখনো</strong> ইনসুলিনের মাত্রা
+                হিসাব করি না, ওষুধ বদলাই না, রোগও ঠিক করি না।
               </p>
-              <p>Always check with your doctor before changing insulin or other medicines.</p>
+              <p>ইনসুলিন বা অন্য কোনো ওষুধ বদলানোর আগে সবসময় ডাক্তারের সাথে কথা বলুন।</p>
             </div>
 
             <label className="card flex cursor-pointer items-start gap-3 p-4 active:bg-canvas">
@@ -452,11 +475,11 @@ export default function OnboardingPage() {
                 onChange={(e) => updateField("disclaimerAccepted", e.target.checked)}
                 className="mt-0.5 h-6 w-6 shrink-0 cursor-pointer rounded-md accent-ink"
               />
-              <span className="text-base font-semibold leading-snug text-ink">
-                I understand Jotno gives food and lifestyle guidance only, not medical advice.
+              <span className="text-lg font-semibold leading-snug text-ink">
+                আমি বুঝেছি, যত্ন শুধু খাবার ও অভ্যাস নিয়ে পরামর্শ দেয়, চিকিৎসার পরামর্শ দেয় না।
               </span>
             </label>
-            <FieldError message={stepErrors.disclaimerAccepted} />
+            <FieldError field="disclaimerAccepted" message={stepErrors.disclaimerAccepted} />
           </div>
         )}
       </main>
@@ -464,17 +487,17 @@ export default function OnboardingPage() {
       {/* Sticky action bar */}
       <div className="sticky bottom-0 z-30 bg-canvas/95 px-4 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur-xl">
         {currentStep < 3 ? (
-          <button type="button" onClick={handleNext} className="btn-primary">
-            Continue
+          <button type="button" onClick={handleNext} className="btn-primary h-14 text-lg">
+            এগিয়ে যান
           </button>
         ) : (
-          <button type="submit" id="submit-onboarding-btn" disabled={!canSubmit} className="btn-primary">
+          <button type="submit" id="submit-onboarding-btn" disabled={!canSubmit} className="btn-primary h-14 text-lg">
             {isSubmitting ? (
-              <span>Saving…</span>
+              <span>একটু অপেক্ষা করুন…</span>
             ) : (
               <>
                 <CheckCircle2 className="h-5 w-5" />
-                <span>{isEditing ? "Save profile" : "Finish setup"}</span>
+                <span>{isEditing ? "রাখুন" : "শেষ করুন"}</span>
               </>
             )}
           </button>

@@ -14,12 +14,16 @@ import {
   generateTelemetrySummary,
   generateTrajectoryDataset,
 } from "@/utils/telemetry";
+import { CONTEXT_LABELS_BN, LEVEL_LABELS_BN, classifyGlucose, toBanglaDigits } from "@/lib/assistant/bangla";
 
-const CONTEXT_LABELS: Record<string, string> = {
-  fasting: "Fasting",
-  post_meal: "After meal",
-  bedtime: "Bedtime",
-  random: "Random",
+const CONTEXT_LABELS: Record<string, string> = CONTEXT_LABELS_BN;
+
+const LEVEL_STYLES = {
+  low: "bg-risk-danger text-risk-dangerInk",
+  good: "bg-risk-safe text-risk-safeInk",
+  slightly_high: "bg-risk-caution text-risk-cautionInk",
+  high: "bg-risk-danger text-risk-dangerInk",
+  very_high: "bg-risk-danger text-risk-dangerInk",
 };
 
 export default function TelemetryPage() {
@@ -113,37 +117,37 @@ export default function TelemetryPage() {
   };
 
   return (
-    <>
+    <div lang="bn">
       <PageHeader
-        title="Glucose"
-        subtitle="Your readings vs. your target path"
+        title="সুগার"
+        subtitle="আপনার সুগার আর লক্ষ্যের পথ"
         actions={
           <button
             type="button"
             onClick={() => setIsModalOpen(true)}
-            aria-label="Log a reading"
-            className="fab h-10 w-10 bg-pastel-blue-strong"
+            aria-label="সুগার লিখুন"
+            className="fab h-12 w-12 bg-pastel-blue-strong"
           >
-            <Plus className="h-5 w-5" strokeWidth={2.5} />
+            <Plus className="h-6 w-6" strokeWidth={2.5} />
           </button>
         }
       />
 
-      <main className="px-4 py-5 space-y-5">
+      <main lang="bn" className="px-4 py-5 space-y-5">
         {/* Horizon selector */}
-        <div className="flex justify-center gap-2">
+        <div className="flex justify-center gap-2" role="group" aria-label="কত দিনের হিসাব দেখবেন">
           {[
-            { days: 7, label: "1W" },
-            { days: 14, label: "2W" },
-            { days: 30, label: "1M" },
-            { days: 84, label: "12W" },
+            { days: 7, label: "১ সপ্তাহ" },
+            { days: 14, label: "২ সপ্তাহ" },
+            { days: 30, label: "১ মাস" },
+            { days: 84, label: "৩ মাস" },
           ].map((h) => (
             <button
               key={h.days}
               type="button"
               onClick={() => setHorizonDays(h.days)}
               aria-pressed={horizonDays === h.days}
-              className="chip-toggle h-11 min-w-[64px] justify-center"
+              className="chip-toggle h-12 min-w-[72px] flex-1 justify-center px-2 text-base"
             >
               {h.label}
             </button>
@@ -152,17 +156,17 @@ export default function TelemetryPage() {
 
         {/* Sample data notice */}
         {benchmarkActive ? (
-          <div className="card p-4 text-sm font-medium text-ink-soft">
-            You&apos;re viewing a sample week. Log your own reading to replace it.
+          <div className="card p-4 text-base font-medium text-ink-soft">
+            এগুলো নমুনা মাপ। নিজের সুগার লিখলে আপনার মাপ দেখাবে।
           </div>
         ) : (
           <button
             type="button"
             onClick={handleLoadBenchmark}
-            className="flex h-11 items-center gap-2 rounded-full px-1 text-sm font-bold text-ink-soft active:text-ink"
+            className="flex h-12 items-center gap-2 rounded-full px-1 text-base font-bold text-ink-soft active:text-ink"
           >
-            <RefreshCw className="h-4 w-4" />
-            Load sample week
+            <RefreshCw className="h-5 w-5" />
+            নমুনা মাপ দেখুন
           </button>
         )}
 
@@ -172,41 +176,33 @@ export default function TelemetryPage() {
 
         {/* Reading history */}
         <section>
-          <h2 className="section-title mb-3">Readings ({logs.length})</h2>
+          <h2 className="mb-3 text-lg font-bold text-ink">সব মাপ ({toBanglaDigits(logs.length)}টি)</h2>
           <ul className="space-y-2.5">
             {logs.map((log) => {
-              const valMg = log.glucose_value <= 35 ? log.glucose_value * 18 : log.glucose_value;
-              const isInRange = valMg >= 70 && valMg <= 140;
+              const level = classifyGlucose(log.glucose_value);
               const mmolVal = log.glucose_value <= 35 ? log.glucose_value : Number((log.glucose_value / 18).toFixed(1));
 
               return (
-                <li key={log.id} className="card flex items-center gap-3 p-3.5">
+                <li key={log.id} className="card flex items-center gap-3 p-4">
                   <div className="icon-badge bg-pastel-blue text-pastel-blue-ink">
                     <Droplet className="h-5 w-5" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="font-bold text-ink">
-                      {mmolVal} <span className="text-sm font-semibold text-ink-muted">mmol/L</span>
-                      {log.glucose_value > 35 && (
-                        <span className="ml-1.5 text-xs font-normal text-ink-muted">({log.glucose_value} mg/dL)</span>
-                      )}
+                    <p className="text-xl font-bold text-ink">
+                      {toBanglaDigits(mmolVal)} <span className="text-base font-semibold text-ink-muted">mmol/L</span>
                     </p>
-                    <p className="text-sm font-medium text-ink-muted">
-                      {CONTEXT_LABELS[log.context] ?? log.context} · Day {log.day_offset}
+                    <p className="text-base font-medium text-ink-muted">
+                      {CONTEXT_LABELS[log.context] ?? log.context} · দিন {toBanglaDigits(log.day_offset)}
                     </p>
                     {log.linked_meal_title && (
-                      <p className="mt-0.5 flex items-center gap-1.5 text-sm text-ink-soft">
-                        <Utensils className="h-3.5 w-3.5 shrink-0" />
+                      <p className="mt-0.5 flex items-center gap-1.5 text-base text-ink-soft">
+                        <Utensils className="h-5 w-5 shrink-0" />
                         <span className="truncate">{log.linked_meal_title}</span>
                       </p>
                     )}
                   </div>
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-bold ${
-                      isInRange ? "bg-risk-safe text-risk-safeInk" : "bg-risk-caution text-risk-cautionInk"
-                    }`}
-                  >
-                    {isInRange ? "In range" : "Elevated"}
+                  <span className={`shrink-0 rounded-full px-3 py-1 text-base font-bold ${LEVEL_STYLES[level]}`}>
+                    {LEVEL_LABELS_BN[level]}
                   </span>
                 </li>
               );
@@ -216,14 +212,14 @@ export default function TelemetryPage() {
 
         <Link
           href="/deficits"
-          className="card flex items-center gap-3 p-3.5 active:bg-canvas"
+          className="card flex min-h-[64px] items-center gap-3 p-4 active:bg-canvas"
         >
           <div className="icon-badge bg-pastel-lime text-pastel-lime-ink">
             <Salad className="h-5 w-5" />
           </div>
           <div className="flex-1">
-            <p className="font-bold text-ink">Check your nutrition gaps</p>
-            <p className="text-sm font-medium text-ink-muted">See which foods could help steady your levels</p>
+            <p className="text-lg font-bold text-ink">পুষ্টিতে কী কম আছে দেখুন</p>
+            <p className="text-base font-medium text-ink-muted">কোন খাবার সুগার ঠিক রাখতে সাহায্য করবে</p>
           </div>
           <ChevronRight className="h-5 w-5 text-ink-muted" />
         </Link>
@@ -235,6 +231,6 @@ export default function TelemetryPage() {
         onSave={handleSaveLog}
         currentDayOffset={logs.length}
       />
-    </>
+    </div>
   );
 }

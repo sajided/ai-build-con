@@ -30,7 +30,7 @@ export default function ProgressRing({ value, color, size = 44, stroke = 6, labe
         />
       </svg>
       {label && (
-        <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold text-ink">
+        <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-ink">
           {label}
         </span>
       )}

@@ -37,9 +37,22 @@ export interface ReportStats {
 
 export const REPORT_PERIODS = [7, 14, 30] as const;
 
-/** Target band used for "in range": 70–180 mg/dL, the standard time-in-range band. */
+/**
+ * Target band used for the doctor's "time in range": 70–180 mg/dL (3.9–10.0 mmol/L), the
+ * international CGM standard. The patient-facing "good" band is tighter (3.9–7.8, classifyGlucose).
+ */
 export const RANGE_LOW = 70;
 export const RANGE_HIGH = 180;
+
+/** Readings may be stored in mmol/L (<= 35) or mg/dL; all stats are computed in mg/dL. */
+export function toMgDl(value: number): number {
+  return value <= 35 ? Math.round(value * 18) : value;
+}
+
+/** mg/dL (or mmol/L) -> mmol/L with one decimal, for display. */
+export function toMmol(value: number): number {
+  return value <= 35 ? Number(value.toFixed(1)) : Number((value / 18).toFixed(1));
+}
 
 export function readingsInPeriod(logs: GlucoseLog[], days: number, now = new Date()) {
   const from = now.getTime() - days * 24 * 60 * 60 * 1000;
@@ -52,13 +65,13 @@ export function readingsInPeriod(logs: GlucoseLog[], days: number, now = new Dat
 }
 
 export function computeStats(readings: { value: number; context: MeasurementContext }[]): ReportStats {
-  const values = readings.map((r) => r.value);
+  const values = readings.map((r) => toMgDl(r.value));
   const avg = (xs: number[]) => (xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null);
 
   const byContext: ReportStats["byContext"] = {};
   for (const r of readings) {
     const entry = byContext[r.context] ?? { count: 0, average: 0 };
-    entry.average = (entry.average * entry.count + r.value) / (entry.count + 1);
+    entry.average = (entry.average * entry.count + toMgDl(r.value)) / (entry.count + 1);
     entry.count++;
     byContext[r.context] = entry;
   }
@@ -135,7 +148,7 @@ export function encodeSnapshot(s: CareSnapshot): string {
     d: s.days,
     r: s.readings
       .slice(0, MAX_SNAPSHOT_READINGS)
-      .map((r) => [Math.round(new Date(r.at).getTime() / 60000), Math.round(r.value), Math.max(0, CONTEXTS.indexOf(r.context))]),
+      .map((r) => [Math.round(new Date(r.at).getTime() / 60000), Math.round(toMgDl(r.value)), Math.max(0, CONTEXTS.indexOf(r.context))]),
     m: s.medicines.map((m) => [m.name, m.times]),
     a: [s.adherence.scheduled, s.adherence.taken],
   };

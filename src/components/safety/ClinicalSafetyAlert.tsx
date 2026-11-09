@@ -21,55 +21,64 @@ export function ClinicalSafetyAlert({
     <div
       role="alert"
       data-testid="clinical-safety-alert"
+      lang="bn"
       className="tile space-y-4 bg-pastel-coral p-5 text-pastel-coral-ink"
     >
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="icon-badge bg-white/85 text-pastel-coral-ink">
-          <AlertOctagon className="h-5 w-5" />
+          <AlertOctagon className="h-6 w-6" />
         </div>
-        <h2 className="flex-1 text-base font-extrabold">Please ask your doctor about this</h2>
+        <h2 className="flex-1 text-xl font-bold">এ বিষয়ে ডাক্তারকে জিজ্ঞেস করুন</h2>
         {onDismiss && (
           <button
             type="button"
             onClick={onDismiss}
-            className="h-10 rounded-full px-3 text-sm font-bold active:bg-black/5"
+            className="h-12 rounded-full px-4 text-base font-bold active:bg-black/5"
           >
-            Dismiss
+            বন্ধ করুন
           </button>
         )}
       </div>
 
       {/* Standardized Clinical Disclaimer (TC-P7-01 Requirement) */}
-      <div className="rounded-2xl bg-white/85 p-4">
-        <p
-          data-testid="standardized-clinical-refusal-text"
-          className="text-sm font-semibold leading-relaxed text-ink"
-        >
-          {refusalText}
+      <div className="space-y-3 rounded-2xl bg-white/85 p-4">
+        <p className="text-lg font-semibold leading-relaxed text-ink">
+          যত্ন ইনসুলিনের মাত্রা হিসাব করে না, ওষুধও বদলায় না। ওষুধ নিয়ে যেকোনো প্রশ্ন আপনার ডাক্তারকে করুন। খুব
+          খারাপ লাগলে এখনই জরুরি নম্বরে ফোন করুন।
         </p>
+        {/* Standardized refusal / guardrail reason stay verbatim (English) for audit; shown on demand */}
+        <details className="text-base text-ink-soft">
+          <summary className="flex h-12 cursor-pointer items-center font-bold">ইংরেজিতে বিস্তারিত</summary>
+          <p
+            lang="en"
+            data-testid="standardized-clinical-refusal-text"
+            className="text-base leading-relaxed text-ink"
+          >
+            {refusalText}
+          </p>
+          {reason && (
+            <p lang="en" className="mt-2 text-base">
+              <strong className="font-bold">Why:</strong> {reason}
+            </p>
+          )}
+        </details>
       </div>
-
-      {reason && (
-        <p className="text-sm font-medium">
-          <strong className="font-extrabold">Why:</strong> {reason}
-        </p>
-      )}
 
       {/* Emergency / Doctor Quick Actions */}
       <div className="flex flex-wrap items-center gap-2">
         <a
-          href="tel:911"
+          href="tel:999"
           data-testid="emergency-call-button"
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-ink px-5 text-sm font-bold text-white active:bg-black"
+          className="inline-flex h-14 items-center gap-2 rounded-full bg-ink px-5 text-lg font-bold text-white active:bg-black"
         >
-          <PhoneCall className="h-4 w-4" />
-          <span>Call Emergency (911)</span>
+          <PhoneCall className="h-5 w-5" />
+          <span>জরুরি ফোন (৯৯৯)</span>
         </a>
 
-        <span className="chip h-11 px-4">
-          <HeartPulse className="h-4 w-4 text-pastel-coral-strong" />
-          Food guidance only
+        <span className="chip h-12 px-4 text-base">
+          <HeartPulse className="h-5 w-5 text-pastel-coral-strong" />
+          শুধু খাবারের পরামর্শ
         </span>
       </div>
     </div>

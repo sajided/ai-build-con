@@ -2,10 +2,11 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Video,
   VideoOff,
-  ArrowUp,
+  ImagePlus,
   Mic,
   MicOff,
   X,
@@ -19,36 +20,67 @@ import {
   ShoppingBasket,
   Utensils,
   Salad,
-  Sparkles,
   ChevronDown,
+  ChevronLeft,
   Layers,
+  Loader2,
+  ScanLine,
+  CircleCheck,
+  CircleAlert,
+  type LucideIcon,
 } from "lucide-react";
+import { toBanglaDigits } from "@/lib/assistant/bangla";
 import type { MultimodalOutput } from "@/app/api/scanner/multimodal/route";
 import { speak, stopSpeaking } from "@/lib/assistant/client";
 
 const SAMPLE_PRESETS = [
   {
     key: "bazaar",
-    title: "🥕 Bazaar Produce Basket",
-    subtitle: "Bitter gourd, red lentils, spinach, potatoes, chilies",
+    emoji: "🥕",
+    title: "বাজারের ঝুড়ি (নমুনা)",
+    subtitle: "করলা, মসুর ডাল, পালং শাক, আলু, কাঁচা মরিচ",
     payload: "mock-preset",
     query: "Are these items diabetic-safe and what can I cook?",
   },
   {
     key: "cooked",
-    title: "🍽️ Cooked Meal Plate",
-    subtitle: "Steamed rice, salmon fillet, sautéed greens",
+    emoji: "🍽️",
+    title: "রান্না করা খাবার (নমুনা)",
+    subtitle: "ভাত, মাছ, শাক",
     payload: "mock-cooked-meal",
     query: "How should I sequence eating this meal to avoid a spike?",
   },
   {
     key: "menu",
-    title: "📋 Restaurant Menu",
-    subtitle: "Tandoori chicken, dal tadka, butter naan, paneer",
+    emoji: "📋",
+    title: "রেস্তোরাঁর মেনু (নমুনা)",
+    subtitle: "তন্দুরি চিকেন, ডাল, নান, পনির",
     payload: "mock-restaurant-menu",
     query: "What on this menu won't spike my blood sugar?",
   },
 ];
+
+type Risk = "green" | "yellow" | "red";
+
+// Same words and colours as the home screen verdicts
+const VERDICT: Record<Risk, { label: string; className: string; icon: LucideIcon }> = {
+  green: { label: "ভালো", className: "bg-risk-safe text-risk-safeInk", icon: CircleCheck },
+  yellow: { label: "অল্প খান", className: "bg-risk-caution text-risk-cautionInk", icon: CircleAlert },
+  red: { label: "এড়িয়ে চলুন", className: "bg-risk-danger text-risk-dangerInk", icon: AlertTriangle },
+};
+
+const TYPE_META: Record<string, { label: string; badge: string; icon: LucideIcon }> = {
+  grocery_bazaar: { label: "বাজার", badge: "bg-pastel-lime text-pastel-lime-ink", icon: ShoppingBasket },
+  prepared_food: { label: "রান্না করা খাবার", badge: "bg-pastel-peach text-pastel-peach-ink", icon: Salad },
+  restaurant_menu: { label: "রেস্তোরাঁর মেনু", badge: "bg-pastel-blue text-pastel-blue-ink", icon: Utensils },
+};
+
+/** Final risk for display: the server already guarded it; GI thresholds are a last safety net. */
+function itemRisk(item: { risk_level?: Risk; gi_index: number }): Risk {
+  if (item.risk_level === "red" || item.gi_index >= 70) return "red";
+  if (item.risk_level === "yellow" || item.gi_index >= 55) return "yellow";
+  return "green";
+}
 
 export default function GeminiLiveScanner() {
   const router = useRouter();
@@ -490,182 +522,152 @@ export default function GeminiLiveScanner() {
     router.push("/dashboard");
   };
 
+  const riskCounts = result
+    ? (result.identified_items || []).reduce(
+        (acc, item) => {
+          acc[itemRisk(item)] += 1;
+          return acc;
+        },
+        { green: 0, yellow: 0, red: 0 } as Record<Risk, number>
+      )
+    : null;
+
   return (
-    <div className="relative h-[100dvh] w-full bg-black text-white overflow-hidden select-none font-sans flex flex-col justify-between">
-      {/* ===================================================================== */}
-      {/* 1. CAMERA BACKGROUND VIEWFINDER                                       */}
-      {/* ===================================================================== */}
+    <div lang="bn" className="relative h-[100dvh] w-full bg-black overflow-hidden select-none flex flex-col justify-between">
+      {/* 1. CAMERA VIEWFINDER (stays dark: it is the camera feed) */}
       <div className="absolute inset-0 z-0 bg-black flex items-center justify-center overflow-hidden">
         {cameraActive ? (
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-full object-cover"
-          />
+          <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
         ) : capturedImage ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={capturedImage}
-            alt="Capture preview"
-            className="w-full h-full object-cover"
-          />
+          <img src={capturedImage} alt="আপনার ছবি" className="w-full h-full object-cover" />
         ) : (
-          <div className="flex flex-col items-center justify-center p-6 text-center space-y-3 text-slate-400">
-            <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center text-white/70">
-              <VideoOff className="w-8 h-8" />
+          <div className="card mx-6 flex max-w-sm flex-col items-center gap-3 p-6 text-center">
+            <span className="icon-badge h-14 w-14 bg-pastel-blue text-pastel-blue-ink">
+              <VideoOff className="h-7 w-7" />
+            </span>
+            <p className="text-xl font-bold text-ink">ক্যামেরা বন্ধ আছে</p>
+            <p className="text-base text-ink-soft">নিচের ক্যামেরা বোতাম চাপুন, অথবা গ্যালারি থেকে ছবি দিন।</p>
+          </div>
+        )}
+
+        {/* Framing guide */}
+        {cameraActive && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="relative h-64 w-64 rounded-[32px] border-2 border-white/30">
+              <div className="absolute left-2 top-2 h-6 w-6 rounded-tl-lg border-l-4 border-t-4 border-white" />
+              <div className="absolute right-2 top-2 h-6 w-6 rounded-tr-lg border-r-4 border-t-4 border-white" />
+              <div className="absolute bottom-2 left-2 h-6 w-6 rounded-bl-lg border-b-4 border-l-4 border-white" />
+              <div className="absolute bottom-2 right-2 h-6 w-6 rounded-br-lg border-b-4 border-r-4 border-white" />
             </div>
-            <p className="text-sm font-semibold text-white">Camera is paused</p>
-            <p className="text-xs text-slate-400 max-w-xs">
-              Tap the blue camera button below or select a sample preset to scan food items.
-            </p>
           </div>
         )}
 
-        {/* Live scanning target crosshair / reticle lines */}
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="relative w-64 h-64 border-2 border-white/20 rounded-3xl">
-            <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-white rounded-tl" />
-            <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-white rounded-tr" />
-            <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-white rounded-bl" />
-            <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-white rounded-br" />
-          </div>
-        </div>
+        {isFlashing && <div className="pointer-events-none absolute inset-0 z-30 bg-white/70 transition-opacity duration-200" />}
 
-        {/* Shutter flash effect */}
-        {isFlashing && (
-          <div className="absolute inset-0 bg-white/70 z-30 pointer-events-none transition-opacity duration-200" />
-        )}
-
-        {/* Processing Spinner Overlay */}
         {isProcessing && (
-          <div className="absolute inset-0 bg-black/75 backdrop-blur-md flex flex-col items-center justify-center gap-3 z-30 animate-fade-in">
-            <div className="relative flex items-center justify-center">
-              <span className="absolute w-20 h-20 rounded-full bg-cyan-500/20 animate-ping" />
-              <div className="w-16 h-16 rounded-full border-4 border-cyan-400/30 border-t-cyan-400 animate-spin" />
-              <Sparkles className="w-7 h-7 text-cyan-300 absolute" />
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/60">
+            <div className="card flex flex-col items-center gap-3 px-8 py-6" aria-live="polite">
+              <Loader2 className="h-12 w-12 animate-spin text-ink" />
+              <p className="text-xl font-bold text-ink">একটু অপেক্ষা করুন…</p>
+              <p className="text-base text-ink-soft">খাবার দেখে বুঝে নিচ্ছি</p>
             </div>
-            <p className="text-sm font-bold text-white tracking-wide">
-              Jotno Live is analyzing…
-            </p>
-            <p className="text-xs text-cyan-200/80">
-              বাজার, খাবার বা মেনু দ্রুত বিশ্লেষণ করা হচ্ছে…
-            </p>
           </div>
         )}
 
-        {/* Recording Voice Pulse Indicator */}
         {isRecording && (
-          <div className="absolute top-20 inset-x-4 mx-auto max-w-xs bg-red-600/90 backdrop-blur-md text-white text-xs py-2 px-4 rounded-full flex items-center justify-center gap-2 shadow-2xl z-30 animate-pulse">
-            <span className="w-2.5 h-2.5 rounded-full bg-white animate-ping" />
-            <span className="font-bold">Listening… Release to analyze</span>
+          <div className="absolute inset-x-4 top-24 z-30 mx-auto flex max-w-xs items-center justify-center gap-2 rounded-full bg-pastel-coral-strong px-5 py-3 text-lg font-bold text-white shadow-float">
+            <span className="h-3 w-3 animate-ping rounded-full bg-white" />
+            শুনছি… ছেড়ে দিলে পাঠাবো
           </div>
         )}
       </div>
 
-      {/* ===================================================================== */}
-      {/* 2. TOP FLOATING STATUS & CONTROLS HUD                                 */}
-      {/* ===================================================================== */}
-      <header className="relative z-20 pt-[calc(env(safe-area-inset-top)+1rem)] px-5 flex items-center justify-between">
-        {/* Top-Left: Jotno Live Status Pill & Mode Badge */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setShowPresets((p) => !p)}
-            aria-label="Toggle sample presets & options"
-            className="h-10 px-3.5 rounded-full bg-emerald-600/90 hover:bg-emerald-500 active:scale-95 text-white flex items-center gap-2 shadow-lg backdrop-blur-md transition-all border border-emerald-400/30"
-          >
-            <span className="w-2 h-2 rounded-full bg-emerald-300 animate-ping" />
-            <span className="text-xs font-bold tracking-wide select-none text-white">Jotno Live</span>
-          </button>
-          {isLiveResult === true && (
-            <span className="text-[10px] px-2.5 py-1 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 font-semibold backdrop-blur-md">
-              ⚡ লাইভ AI
-            </span>
-          )}
+      {/* 2. TOP BAR */}
+      <header className="relative z-20 flex items-center justify-between gap-2 px-4 pt-[calc(env(safe-area-inset-top)+1rem)]">
+        <button
+          type="button"
+          onClick={closeLiveSession}
+          aria-label="ফিরে যান"
+          className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-ink shadow-soft active:bg-canvas"
+        >
+          <ChevronLeft className="h-6 w-6" />
+        </button>
+
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="rounded-full bg-white px-4 py-2 text-lg font-bold text-ink shadow-soft">লাইভ স্ক্যান</span>
           {isLiveResult === false && (
-            <span className="text-[10px] px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/40 font-semibold backdrop-blur-md">
-              ডেমো মোড
+            <span className="rounded-full bg-risk-caution px-3 py-1.5 text-sm font-bold text-risk-cautionInk shadow-soft">
+              ডেমো
             </span>
           )}
         </div>
 
-        {/* Top-Right: 3 Translucent Circular Buttons */}
-        <div className="flex items-center gap-2.5">
-          {/* Flip Camera */}
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={toggleFlipCamera}
-            aria-label="Flip camera"
-            className="w-11 h-11 rounded-full bg-black/60 hover:bg-black/80 active:scale-90 border border-white/15 backdrop-blur-xl flex items-center justify-center text-white shadow-lg transition-transform"
+            aria-label="ক্যামেরা ঘোরান"
+            className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-ink shadow-soft active:bg-canvas"
           >
-            <RotateCcw className="w-5 h-5" />
+            <RotateCcw className="h-5 w-5" />
           </button>
-
-          {/* Camera Mute / Off toggle */}
-          <button
-            type="button"
-            onClick={toggleCameraPower}
-            aria-label="Toggle camera"
-            className="w-11 h-11 rounded-full bg-black/60 hover:bg-black/80 active:scale-90 border border-white/15 backdrop-blur-xl flex items-center justify-center text-white shadow-lg transition-transform"
-          >
-            {cameraActive ? <Video className="w-5 h-5 text-white" /> : <VideoOff className="w-5 h-5 text-red-400" />}
-          </button>
-
-          {/* More / Presets Menu */}
           <button
             type="button"
             onClick={() => setShowPresets((prev) => !prev)}
-            aria-label="Options"
-            className="w-11 h-11 rounded-full bg-black/60 hover:bg-black/80 active:scale-90 border border-white/15 backdrop-blur-xl flex items-center justify-center text-white shadow-lg transition-transform"
+            aria-label="আরও"
+            aria-expanded={showPresets}
+            className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-ink shadow-soft active:bg-canvas"
           >
-            <MoreHorizontal className="w-5 h-5" />
+            <MoreHorizontal className="h-5 w-5" />
           </button>
         </div>
       </header>
 
-      {/* Error notification banner */}
+      {/* Error banner */}
       {errorMessage && (
-        <div className="relative z-30 mx-4 mt-2 bg-red-950/95 border border-red-500/60 backdrop-blur-md text-white text-xs p-3 rounded-2xl flex items-start justify-between gap-3 shadow-2xl animate-fade-in">
+        <div
+          role="alert"
+          className="relative z-30 mx-4 mt-3 flex items-start justify-between gap-3 rounded-3xl bg-risk-danger p-4 text-risk-dangerInk shadow-float"
+        >
           <div className="flex items-start gap-2">
-            <span className="text-red-400 font-bold text-sm shrink-0">⚠️</span>
-            <p className="text-xs leading-relaxed text-red-100">{errorMessage}</p>
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+            <p className="text-base font-semibold leading-relaxed">{errorMessage}</p>
           </div>
           <button
+            type="button"
             onClick={() => setErrorMessage(null)}
-            className="text-red-300 hover:text-white p-1 text-sm font-bold shrink-0"
-            aria-label="Dismiss error"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/60"
+            aria-label="বন্ধ করুন"
           >
-            ✕
+            <X className="h-5 w-5" />
           </button>
         </div>
       )}
 
-      {/* ===================================================================== */}
-      {/* 3. PRESETS POPUP / QUICK DRAWER (ACCESSIBLE VIA TOP HUD)              */}
-      {/* ===================================================================== */}
+      {/* 3. MORE: typed question, samples, restaurant menu page */}
       {showPresets && (
-        <div className="relative z-30 mx-4 mt-2 p-3 bg-slate-950/95 backdrop-blur-2xl border border-white/20 rounded-2xl shadow-2xl space-y-3 animate-in fade-in">
-          <div className="flex items-center justify-between pb-1 border-b border-white/10">
-            <span className="text-xs font-bold text-slate-300">Quick Test & Voice Question</span>
+        <div className="card relative z-30 mx-4 mt-3 space-y-4 p-4 shadow-float">
+          <div className="flex items-center justify-between">
+            <p className="text-lg font-bold text-ink">প্রশ্ন ও নমুনা</p>
             <button
               type="button"
               onClick={() => setShowPresets(false)}
-              className="text-slate-400 hover:text-white"
+              aria-label="বন্ধ করুন"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-canvas text-ink"
             >
-              <X className="w-4 h-4" />
+              <X className="h-5 w-5" />
             </button>
           </div>
 
-          {/* Optional custom text query */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <input
               type="text"
               value={textPrompt}
               onChange={(e) => setTextPrompt(e.target.value)}
-              placeholder="Ask custom question (or hold capsule below)..."
-              className="flex-1 bg-white/10 border border-white/15 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400"
+              placeholder="প্রশ্ন লিখুন…"
+              aria-label="প্রশ্ন লিখুন"
+              className="input h-12 flex-1 text-base"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   setShowPresets(false);
@@ -679,13 +681,14 @@ export default function GeminiLiveScanner() {
                 setShowPresets(false);
                 submitScan(null);
               }}
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-xl text-xs font-bold text-white shrink-0 active:scale-95"
+              className="flex h-12 shrink-0 items-center rounded-full bg-ink px-5 text-base font-bold text-white active:bg-black"
             >
-              Ask
+              পাঠান
             </button>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="space-y-2">
+            <p className="section-title">নমুনা দেখুন</p>
             {SAMPLE_PRESETS.map((p) => (
               <button
                 key={p.key}
@@ -694,220 +697,204 @@ export default function GeminiLiveScanner() {
                   setShowPresets(false);
                   submitScan(null, { payload: p.payload, query: p.query });
                 }}
-                className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-left transition-all border border-white/10"
+                className="flex min-h-[56px] w-full items-center gap-3 rounded-2xl bg-canvas px-4 py-2 text-left active:bg-line"
               >
-                <p className="text-xs font-bold text-white">{p.title}</p>
-                <p className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">{p.subtitle}</p>
+                <span className="text-2xl" aria-hidden>{p.emoji}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-base font-bold text-ink">{p.title}</span>
+                  <span className="block truncate text-sm text-ink-muted">{p.subtitle}</span>
+                </span>
               </button>
             ))}
           </div>
+
+          <Link href="/menusafe" className="btn-secondary h-14 text-lg">
+            <Utensils className="h-5 w-5" />
+            রেস্তোরাঁর মেনু আলাদা করে দেখুন
+          </Link>
         </div>
       )}
 
-      {/* Hidden File Picker */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={handleFileUpload}
-      />
+      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
 
-      {/* ===================================================================== */}
-      {/* 4. RESULTS FLOATING SHEET / TRANSLUCENT HUD                           */}
-      {/* ===================================================================== */}
+      {/* 4. RESULT SHEET (same cards and verdict pills as the home screen) */}
       {result && (
-        <div className="relative z-20 mx-4 mb-2 bg-slate-950/90 backdrop-blur-2xl border border-white/20 rounded-3xl p-4 shadow-2xl max-h-[55vh] overflow-y-auto space-y-3.5 no-scrollbar">
-          {/* Header & Category Badge */}
-          <div className="flex items-center justify-between">
-            <span
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                result.detected_type === "restaurant_menu"
-                  ? "bg-blue-600/80 text-blue-100 border border-blue-400/30"
-                  : result.detected_type === "prepared_food"
-                  ? "bg-amber-600/80 text-amber-100 border border-amber-400/30"
-                  : "bg-emerald-600/80 text-emerald-100 border border-emerald-400/30"
-              }`}
-            >
-              {result.detected_type === "restaurant_menu" && <Utensils className="w-3.5 h-3.5" />}
-              {result.detected_type === "prepared_food" && <Salad className="w-3.5 h-3.5" />}
-              {result.detected_type === "grocery_bazaar" && <ShoppingBasket className="w-3.5 h-3.5" />}
-              {result.detected_title || result.detected_type}
+        <div className="relative z-20 mx-4 mb-3 mt-3 max-h-[58vh] space-y-4 overflow-y-auto rounded-[32px] bg-canvas p-4 shadow-float no-scrollbar">
+          <div className="flex items-center gap-3">
+            <span className={`icon-badge h-12 w-12 ${TYPE_META[result.detected_type]?.badge ?? TYPE_META.grocery_bazaar.badge}`}>
+              {(() => {
+                const Icon = TYPE_META[result.detected_type]?.icon ?? ShoppingBasket;
+                return <Icon className="h-6 w-6" />;
+              })()}
             </span>
-
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() =>
-                  isSpeaking
-                    ? stopSpeaking()
-                    : speakResponse(result.voice_assistant_response)
-                }
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white"
-                title={isSpeaking ? "Mute" : "Listen"}
-              >
-                {isSpeaking ? <VolumeX className="w-4 h-4 text-red-400" /> : <Volume2 className="w-4 h-4 text-cyan-300" />}
-              </button>
-              <button
-                type="button"
-                onClick={() => setSheetCollapsed((c) => !c)}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white"
-              >
-                <ChevronDown className={`w-4 h-4 transition-transform ${sheetCollapsed ? "rotate-180" : ""}`} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setResult(null)}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-slate-400 hover:text-white"
-                title="Dismiss result"
-              >
-                <X className="w-4 h-4" />
-              </button>
+            <div className="min-w-0 flex-1">
+              <p className="text-base font-semibold text-ink-muted">
+                {TYPE_META[result.detected_type]?.label ?? TYPE_META.grocery_bazaar.label}
+              </p>
+              <p className="truncate text-xl font-bold text-ink">{result.detected_title}</p>
             </div>
+            <button
+              type="button"
+              onClick={() => setSheetCollapsed((c) => !c)}
+              aria-label={sheetCollapsed ? "বড় করুন" : "ছোট করুন"}
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white text-ink shadow-soft"
+            >
+              <ChevronDown className={`h-5 w-5 transition-transform ${sheetCollapsed ? "rotate-180" : ""}`} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setResult(null)}
+              aria-label="বন্ধ করুন"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white text-ink shadow-soft"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
+
+          {/* Verdict summary */}
+          {riskCounts && (
+            <div className="flex flex-wrap gap-2">
+              {(["green", "yellow", "red"] as const)
+                .filter((r) => riskCounts[r] > 0)
+                .map((r) => (
+                  <span key={r} className={`rounded-full px-4 py-1.5 text-lg font-bold ${VERDICT[r].className}`}>
+                    {VERDICT[r].label} · {toBanglaDigits(riskCounts[r])}টি
+                  </span>
+                ))}
+            </div>
+          )}
 
           {!sheetCollapsed && (
             <>
-              {/* Voice Coach Spoken Message */}
+              {/* Spoken answer, same as the home reply card */}
               {result.voice_assistant_response && (
-                <div className="bg-cyan-950/60 border border-cyan-500/40 rounded-2xl p-3 text-xs text-cyan-200 leading-relaxed">
-                  <span className="font-bold text-white block mb-0.5">Jotno Live Coach (যত্ন লাইভ কোচ):</span>
-                  {result.voice_assistant_response}
+                <div className="card p-5" aria-live="polite">
+                  <p className="text-xl font-semibold leading-relaxed text-ink">{result.voice_assistant_response}</p>
+                  <button
+                    type="button"
+                    onClick={() => (isSpeaking ? stopSpeaking() : speakResponse(result.voice_assistant_response))}
+                    className="mt-4 inline-flex h-12 items-center gap-2 rounded-full bg-canvas px-5 text-lg font-semibold text-ink active:bg-line"
+                  >
+                    {isSpeaking ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+                    {isSpeaking ? "থামান" : "আবার শুনুন"}
+                  </button>
                 </div>
               )}
 
-              {/* Health Risk Alerts */}
+              {/* Items with a verdict each */}
+              {result.identified_items && result.identified_items.length > 0 && (
+                <div className="space-y-2">
+                  <p className="section-title">যা দেখা গেছে</p>
+                  {result.identified_items.map((item, idx) => {
+                    const v = VERDICT[itemRisk(item)];
+                    const VIcon = v.icon;
+                    return (
+                      <div key={idx} className="card flex items-center gap-3 p-4">
+                        <span className={`icon-badge ${v.className}`}>
+                          <VIcon className="h-5 w-5" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-lg font-bold leading-snug text-ink">{item.name}</p>
+                          <p className="text-sm text-ink-muted">
+                            {item.quantity ? `${item.quantity} · ` : ""}GI {toBanglaDigits(item.gi_index)} · GL{" "}
+                            {toBanglaDigits(item.gl_load)}
+                          </p>
+                        </div>
+                        <span className={`shrink-0 rounded-full px-3 py-1 text-base font-bold ${v.className}`}>{v.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Alerts */}
               {result.health_risk_alerts && result.health_risk_alerts.length > 0 && (
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   {result.health_risk_alerts.map((alert, idx) => (
-                    <div
-                      key={idx}
-                      className="bg-red-950/70 border border-red-500/50 rounded-xl p-2.5 text-xs text-red-200 flex items-start gap-2 font-medium"
-                    >
-                      <AlertTriangle className="w-4 h-4 shrink-0 text-red-400 mt-0.5" />
+                    <div key={idx} className="flex items-start gap-2 rounded-2xl bg-risk-danger p-4 text-base font-semibold text-risk-dangerInk">
+                      <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
                       <span>{alert}</span>
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* Mode 1: Cooked Food Plate Sequencing */}
-              {result.detected_type === "prepared_food" && result.plate_sequencing && (
-                <div className="bg-slate-900/80 border border-white/10 rounded-2xl p-3 space-y-2">
-                  <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                    <Layers className="w-3.5 h-3.5" /> Clinical Plate Eating Sequence
-                  </span>
-                  <div className="space-y-1.5">
-                    {result.plate_sequencing.map((s) => (
-                      <div key={s.step} className="bg-white/5 rounded-xl p-2 flex items-start gap-2 text-xs">
-                        <span className="w-5 h-5 rounded-full bg-amber-500/30 text-amber-300 font-bold flex items-center justify-center shrink-0">
-                          {s.step}
-                        </span>
-                        <div>
-                          <p className="font-semibold text-white">{s.phase}</p>
-                          <p className="text-slate-300 text-[11px] leading-tight">{s.instruction}</p>
-                        </div>
+              {/* Cooked plate: eating order */}
+              {result.detected_type === "prepared_food" && result.plate_sequencing && result.plate_sequencing.length > 0 && (
+                <div className="card space-y-3 p-4">
+                  <p className="flex items-center gap-2 text-lg font-bold text-ink">
+                    <Layers className="h-5 w-5 text-pastel-peach-strong" /> খাওয়ার ক্রম
+                  </p>
+                  {result.plate_sequencing.map((s) => (
+                    <div key={s.step} className="flex items-start gap-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-pastel-peach text-lg font-bold text-pastel-peach-ink">
+                        {toBanglaDigits(s.step)}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-base font-bold text-ink">{s.phase}</p>
+                        <p className="text-base leading-relaxed text-ink-soft">{s.instruction}</p>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                 </div>
               )}
 
-              {/* Mode 2: Restaurant Menu Waiter Script */}
+              {/* Restaurant: waiter script */}
               {result.detected_type === "restaurant_menu" && result.waiter_script && (
-                <div className="bg-blue-950/60 border border-blue-500/40 rounded-2xl p-3 space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-blue-200 flex items-center gap-1.5">
-                      <Utensils className="w-3.5 h-3.5" /> Waiter Customization Script
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleCopyScript(result.waiter_script!)}
-                      className="px-2.5 py-1 rounded-full bg-blue-600/80 hover:bg-blue-500 text-[11px] font-bold text-white flex items-center gap-1"
-                    >
-                      {copiedScript ? <Check className="w-3 h-3 text-emerald-300" /> : <Copy className="w-3 h-3" />}
-                      {copiedScript ? "Copied" : "Copy"}
-                    </button>
-                  </div>
-                  <p className="text-xs italic text-blue-100 font-medium leading-relaxed">
-                    &ldquo;{result.waiter_script}&rdquo;
+                <div className="space-y-3 rounded-3xl bg-pastel-blue/60 p-4 text-pastel-blue-ink">
+                  <p className="flex items-center gap-2 text-lg font-bold">
+                    <Utensils className="h-5 w-5" /> ওয়েটারকে বলুন
                   </p>
+                  <p className="text-base font-semibold italic leading-relaxed">&ldquo;{result.waiter_script}&rdquo;</p>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyScript(result.waiter_script!)}
+                    className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-white text-base font-bold text-ink active:bg-canvas"
+                  >
+                    {copiedScript ? <Check className="h-5 w-5 text-risk-safeInk" /> : <Copy className="h-5 w-5" />}
+                    {copiedScript ? "কপি হয়েছে" : "কপি করুন"}
+                  </button>
                 </div>
               )}
 
-              {/* Nutritional Summary Badges */}
+              {/* Nutrition */}
               {result.nutritional_summary && (
-                <div className="grid grid-cols-4 gap-1.5 text-center">
-                  <div className="bg-white/10 rounded-xl p-2 border border-white/5">
-                    <span className="text-[10px] text-slate-400 block">Calories</span>
-                    <span className="text-xs font-bold text-white">{result.nutritional_summary.calories || 0}</span>
-                  </div>
-                  <div className="bg-white/10 rounded-xl p-2 border border-white/5">
-                    <span className="text-[10px] text-slate-400 block">Carbs</span>
-                    <span className="text-xs font-bold text-amber-300">{result.nutritional_summary.carbs_g || 0}g</span>
-                  </div>
-                  <div className="bg-white/10 rounded-xl p-2 border border-white/5">
-                    <span className="text-[10px] text-slate-400 block">Protein</span>
-                    <span className="text-xs font-bold text-emerald-300">{result.nutritional_summary.protein_g || 0}g</span>
-                  </div>
-                  <div className="bg-white/10 rounded-xl p-2 border border-white/5">
-                    <span className="text-[10px] text-slate-400 block">Fiber</span>
-                    <span className="text-xs font-bold text-cyan-300">{result.nutritional_summary.fiber_g || 0}g</span>
-                  </div>
+                <div className="grid grid-cols-4 gap-2 text-center">
+                  {[
+                    { label: "ক্যালরি", value: toBanglaDigits(result.nutritional_summary.calories || 0) },
+                    { label: "শর্করা", value: `${toBanglaDigits(result.nutritional_summary.carbs_g || 0)}g` },
+                    { label: "প্রোটিন", value: `${toBanglaDigits(result.nutritional_summary.protein_g || 0)}g` },
+                    { label: "আঁশ", value: `${toBanglaDigits(result.nutritional_summary.fiber_g || 0)}g` },
+                  ].map((n) => (
+                    <div key={n.label} className="card px-1 py-3">
+                      <span className="block text-sm font-semibold text-ink-muted">{n.label}</span>
+                      <span className="block text-lg font-bold text-ink">{n.value}</span>
+                    </div>
+                  ))}
                 </div>
               )}
 
-              {/* Mode 3: Local Bazaar Price Benchmark in Bangladeshi Taka */}
+              {/* Cost in Taka */}
               {result.cost_estimate && (
-                <div className="bg-white/10 border border-white/10 rounded-2xl p-2.5 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-sm">৳</span>
-                    <span className="text-slate-300">
-                      বাজারের আনুমানিক খরচ: <strong className="text-white">৳{result.cost_estimate.total_cost_bdt || Math.round((result.cost_estimate.total_cost_usd || 0) * 120)} টাকা</strong>
+                <div className="card flex items-center justify-between gap-3 p-4">
+                  <div className="flex items-center gap-3">
+                    <span className="icon-badge bg-pastel-lime text-lg font-bold text-pastel-lime-ink">৳</span>
+                    <span className="text-base text-ink-soft">
+                      আনুমানিক খরচ{" "}
+                      <strong className="text-lg text-ink">
+                        ৳{toBanglaDigits(
+                          result.cost_estimate.total_cost_bdt || Math.round((result.cost_estimate.total_cost_usd || 0) * 120)
+                        )}
+                      </strong>
                     </span>
                   </div>
-                  <span className="capitalize text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/40 font-bold">
+                  <span className="shrink-0 rounded-full bg-canvas px-3 py-1 text-sm font-bold text-ink-soft">
                     {result.cost_estimate.budget_tier === "budget_friendly"
-                      ? "সাশ্রয়ী বাজার"
+                      ? "সাশ্রয়ী"
                       : result.cost_estimate.budget_tier === "premium"
-                      ? "প্রিমিয়াম"
-                      : "মাঝারি বাজেট"}
+                      ? "দামি"
+                      : "মাঝারি"}
                   </span>
-                </div>
-              )}
-
-              {/* Detected Items List */}
-              {result.identified_items && result.identified_items.length > 0 && (
-                <div className="space-y-1">
-                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                    Detected Items ({result.identified_items.length})
-                  </p>
-                  <div className="space-y-1">
-                    {result.identified_items.map((item, idx) => {
-                      const isRed = item.risk_level === "red" || item.gi_index >= 70;
-                      const isYellow = item.risk_level === "yellow" || (item.gi_index >= 55 && item.gi_index < 70);
-                      const badgeBg = isRed
-                        ? "bg-red-950 text-red-300 border-red-700/60"
-                        : isYellow
-                        ? "bg-amber-950 text-amber-300 border-amber-700/60"
-                        : "bg-emerald-950 text-emerald-300 border-emerald-700/60";
-
-                      return (
-                        <div
-                          key={idx}
-                          className="bg-white/5 border border-white/10 rounded-xl p-2 flex items-center justify-between text-xs"
-                        >
-                          <div>
-                            <span className="font-medium text-white">{item.name}</span>
-                            <span className="text-[10px] text-slate-400 block">{item.quantity}</span>
-                          </div>
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full border font-bold ${badgeBg}`}>
-                            GI {item.gi_index} · GL {item.gl_load}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
                 </div>
               )}
             </>
@@ -915,134 +902,93 @@ export default function GeminiLiveScanner() {
         </div>
       )}
 
-      {/* ===================================================================== */}
-      {/* 5. THE ICONIC GEMINI LIVE FLOATING DOCK (IDENTICAL TO USER PHOTO)     */}
-      {/* ===================================================================== */}
-      <footer className="relative z-40 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-2 px-5 max-w-sm mx-auto w-full">
-        <div className="flex items-center justify-between gap-2.5">
-          {/* Button 1: Blue Video Camera Button */}
-          <button
-            type="button"
-            onClick={toggleCameraPower}
-            aria-label="Toggle camera stream"
-            className={`w-13 h-13 sm:w-14 sm:h-14 rounded-full flex items-center justify-center shadow-2xl transition-all active:scale-95 ${
-              cameraActive
-                ? "bg-blue-600 hover:bg-blue-500 text-white shadow-blue-500/40"
-                : "bg-slate-800 text-slate-400 border border-white/10"
-            }`}
-          >
-            {cameraActive ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
-          </button>
+      {/* 5. BOTTOM DOCK: labelled buttons; the centre button works like the home talk button */}
+      <footer className="relative z-40 mx-auto w-full max-w-md px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-2">
+        {!result && !isProcessing && !isRecording && (
+          <p className="mb-3 text-center text-base font-semibold text-white drop-shadow">
+            একবার চাপুন: ছবি দেখুন · চেপে ধরে রাখুন: প্রশ্ন বলুন
+          </p>
+        )}
+        <div className="flex items-end justify-between">
+          <DockButton label="গ্যালারি" onClick={() => fileInputRef.current?.click()}>
+            <ImagePlus className="h-6 w-6" />
+          </DockButton>
+          <DockButton label="ক্যামেরা" active={cameraActive} onClick={toggleCameraPower}>
+            {cameraActive ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
+          </DockButton>
 
-          {/* Button 2: Upload / Gallery Button (Arrow Up) */}
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            aria-label="Upload photo from gallery"
-            className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-black/75 hover:bg-black/90 active:scale-90 border border-white/20 backdrop-blur-xl flex items-center justify-center text-white shadow-xl transition-transform"
-          >
-            <ArrowUp className="w-5 h-5" />
-          </button>
-
-          {/* Button 3: THE GEMINI LIVE AUDIO CAPSULE (CENTER GLOWING PILL) */}
-          <button
-            type="button"
-            onPointerDown={handleCapsulePointerDown}
-            onPointerUp={handleCapsulePointerUp}
-            onPointerCancel={handleCapsulePointerCancel}
-            onPointerLeave={handleCapsulePointerCancel}
-            onContextMenu={(e) => e.preventDefault()}
-            onClick={(e) => {
-              // Keyboard activation (Enter/Space) reports detail 0; pointer taps are handled above.
-              if (e.detail === 0) submitScan(null);
-            }}
-            style={{ touchAction: "none" }}
-            aria-label="Jotno Live Voice Push to Talk or Instant Scan"
-            className={`relative w-32 h-13 sm:w-36 sm:h-14 rounded-full bg-black border border-white/25 shadow-2xl overflow-hidden flex items-center justify-center transition-all select-none active:scale-95 ${
-              isRecording
-                ? "scale-105 border-cyan-400 shadow-cyan-500/50"
-                : "hover:border-cyan-400/60"
-            }`}
-          >
-            {/* Fluid Organic Glowing Capsule */}
-            <div
-              className={`absolute -bottom-3 inset-x-1 h-9 rounded-full blur-md transition-all ${
-                isRecording
-                  ? "bg-gradient-to-t from-cyan-400 via-blue-500 to-transparent opacity-100 animate-pulse"
-                  : isSpeaking
-                  ? "bg-gradient-to-t from-emerald-400 via-cyan-500 to-transparent opacity-90 animate-pulse"
-                  : "bg-gradient-to-t from-cyan-400 via-blue-600 to-transparent opacity-85 gemini-live-glow"
+          <div className="flex flex-col items-center gap-1.5">
+            <button
+              type="button"
+              onPointerDown={handleCapsulePointerDown}
+              onPointerUp={handleCapsulePointerUp}
+              onPointerCancel={handleCapsulePointerCancel}
+              onPointerLeave={handleCapsulePointerCancel}
+              onContextMenu={(e) => e.preventDefault()}
+              onClick={(e) => {
+                // Keyboard activation (Enter/Space) reports detail 0; pointer taps are handled above.
+                if (e.detail === 0) submitScan(null);
+              }}
+              disabled={isProcessing}
+              style={{ touchAction: "none" }}
+              aria-label="স্ক্যান করুন। প্রশ্ন বলতে চেপে ধরে রাখুন"
+              className={`relative flex h-20 w-20 items-center justify-center rounded-full text-white shadow-float transition-transform active:scale-95 disabled:opacity-70 ${
+                isRecording ? "bg-pastel-coral-strong" : "bg-ink"
               }`}
-            />
-            {/* Crisp curved bright rim highlight */}
-            <div className="absolute -bottom-1 inset-x-4 h-3 rounded-full bg-cyan-300/80 blur-[2px] pointer-events-none" />
+            >
+              {isRecording && <span className="absolute inset-0 animate-ping rounded-full bg-pastel-coral-strong/40" />}
+              {isProcessing ? (
+                <Loader2 className="h-9 w-9 animate-spin" />
+              ) : isRecording ? (
+                <Mic className="relative h-9 w-9" />
+              ) : (
+                <ScanLine className="h-9 w-9" />
+              )}
+            </button>
+            <span className="text-base font-bold text-white drop-shadow">{isRecording ? "শুনছি" : "স্ক্যান"}</span>
+          </div>
 
-            {/* Inner Equalizer Waveform Soundbars */}
-            <div className="relative z-10 flex items-center gap-1 px-3">
-              <span
-                className={`w-1 rounded-full bg-white transition-all ${
-                  isRecording
-                    ? "h-6 animate-pulse"
-                    : isSpeaking
-                    ? "h-5 animate-pulse"
-                    : "h-3 opacity-80"
-                }`}
-              />
-              <span
-                className={`w-1 rounded-full bg-cyan-200 transition-all ${
-                  isRecording
-                    ? "h-8 animate-pulse delay-75"
-                    : isSpeaking
-                    ? "h-7 animate-pulse delay-75"
-                    : "h-4 opacity-90"
-                }`}
-              />
-              <span
-                className={`w-1 rounded-full bg-white transition-all ${
-                  isRecording
-                    ? "h-7 animate-pulse delay-150"
-                    : isSpeaking
-                    ? "h-6 animate-pulse delay-150"
-                    : "h-5 opacity-100"
-                }`}
-              />
-              <span
-                className={`w-1 rounded-full bg-cyan-200 transition-all ${
-                  isRecording
-                    ? "h-5 animate-pulse"
-                    : isSpeaking
-                    ? "h-4 animate-pulse"
-                    : "h-3 opacity-80"
-                }`}
-              />
-            </div>
-          </button>
-
-          {/* Button 4: Microphone Mute / Toggle Button */}
-          <button
-            type="button"
+          <DockButton
+            label={isMuted ? "মাইক বন্ধ" : "মাইক"}
+            active={!isMuted}
             onClick={() => setIsMuted((m) => !m)}
-            aria-label={isMuted ? "Unmute microphone" : "Mute microphone"}
-            className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full border backdrop-blur-xl flex items-center justify-center shadow-xl transition-transform active:scale-90 ${
-              isMuted
-                ? "bg-red-950/80 border-red-500/50 text-red-400"
-                : "bg-black/75 hover:bg-black/90 border-white/20 text-white"
-            }`}
           >
-            {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5 text-white" />}
-          </button>
-
-          {/* Button 5: Close 'X' Button */}
-          <button
-            type="button"
-            onClick={closeLiveSession}
-            aria-label="Close Jotno Live session"
-            className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-black/75 hover:bg-black/90 active:scale-90 border border-white/20 backdrop-blur-xl flex items-center justify-center text-white shadow-xl transition-transform"
-          >
-            <X className="w-5 h-5" />
-          </button>
+            {isMuted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
+          </DockButton>
+          <DockButton label="বন্ধ" onClick={closeLiveSession}>
+            <X className="h-6 w-6" />
+          </DockButton>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function DockButton({
+  label,
+  onClick,
+  active = true,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  active?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex w-16 flex-col items-center gap-1.5">
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={label}
+        aria-pressed={active}
+        className={`flex h-14 w-14 items-center justify-center rounded-full shadow-soft transition-transform active:scale-95 ${
+          active ? "bg-white text-ink" : "bg-white/70 text-ink-muted"
+        }`}
+      >
+        {children}
+      </button>
+      <span className="text-sm font-bold text-white drop-shadow">{label}</span>
     </div>
   );
 }

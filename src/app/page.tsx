@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Mic, Square, Loader2, Camera, Salad, Droplet, Keyboard, Volume2, Phone, Settings, LayoutGrid, Pill, FileText } from "lucide-react";
+import { Mic, Square, Loader2, Camera, Salad, Droplet, Keyboard, Volume2, Phone, Settings, LayoutGrid, Pill, FileText, ScanLine, ChevronRight } from "lucide-react";
 import type { GlucoseLog, MeasurementContext } from "@/lib/validations/telemetry";
 import type { AssistantResult } from "@/lib/ai/elder-assistant";
 import {
@@ -430,6 +430,21 @@ export default function ElderHomePage() {
         <Keyboard className="h-6 w-6" />
         সুগার নিজে লিখুন
       </button>
+
+      {/* Live scan: groceries, cooked food or a restaurant menu through the camera */}
+      <Link
+        href="/scanner"
+        className="tile mt-3 flex min-h-[96px] items-center gap-4 bg-pastel-peach text-pastel-peach-ink active:opacity-80"
+      >
+        <span className="fab h-14 w-14 bg-pastel-peach-strong">
+          <ScanLine className="h-7 w-7" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-xl font-bold leading-snug">লাইভ স্ক্যান</span>
+          <span className="block text-base font-semibold opacity-80">বাজার, খাবার বা মেনু ক্যামেরায় দেখান</span>
+        </span>
+        <ChevronRight className="h-6 w-6 shrink-0" />
+      </Link>
 
       <section className="mt-3 grid grid-cols-2 gap-3">
         <Link href="/reminders" className="card flex min-h-[88px] items-center gap-3 p-4 active:bg-canvas">

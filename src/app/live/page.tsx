@@ -1,8 +1,6 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import React from "react";
-import GeminiLiveScanner from "@/components/scanner/GeminiLiveScanner";
-
+// /live was a duplicate of /scanner; keep old links working
 export default function LiveScannerPage() {
-  return <GeminiLiveScanner />;
+  redirect("/scanner");
 }

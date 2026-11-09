@@ -12,11 +12,27 @@ import {
   ReferenceArea,
 } from "recharts";
 import type { TrajectoryPoint } from "@/lib/validations/telemetry";
+import { CONTEXT_LABELS_BN, toBanglaDigits } from "@/lib/assistant/bangla";
 
 interface GlucoseChartProps {
   data: TrajectoryPoint[];
   height?: number;
 }
+
+/** Display-only conversion: stored readings may be mg/dL (> 35) or mmol/L (<= 35). */
+export function toMmol(value: number): number {
+  return value <= 35 ? value : Number((value / 18).toFixed(1));
+}
+
+/** Patient "good" band in mmol/L (= 70–140 mg/dL) */
+export const SAFE_BAND_MMOL = { min: 3.9, max: 7.8 } as const;
+export const Y_DOMAIN_MMOL: [number, (dataMax: number) => number] = [3, (dataMax) => Math.max(10.5, Math.ceil(dataMax))];
+export const Y_TICKS_MMOL = [3.9, 5.5, 7.8, 9, 10];
+
+type ChartPoint = Omit<TrajectoryPoint, "actual" | "target"> & {
+  actual: number | null;
+  target: number;
+};
 
 interface CustomTooltipProps {
   active?: boolean;
@@ -24,48 +40,47 @@ interface CustomTooltipProps {
     name: string;
     value: number;
     color: string;
-    payload: TrajectoryPoint;
+    payload: ChartPoint;
   }>;
-  label?: string;
 }
 
-function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
+function CustomTooltip({ active, payload }: CustomTooltipProps) {
   if (active && payload && payload.length > 0) {
     const point = payload[0].payload;
     const actualVal = point.actual;
     const targetVal = point.target;
 
-    const isInRange = actualVal !== null && actualVal !== undefined && actualVal >= 70 && actualVal <= 140;
+    const isInRange =
+      actualVal !== null && actualVal >= SAFE_BAND_MMOL.min && actualVal <= SAFE_BAND_MMOL.max;
+    const contextLabel = point.context ? CONTEXT_LABELS_BN[point.context] ?? point.context : null;
 
     return (
-      <div className="min-w-[170px] space-y-1.5 rounded-2xl bg-white p-3 text-sm shadow-soft">
-        <div className="flex items-center justify-between gap-2 border-b border-line pb-1 font-bold text-ink">
-          <span>{label || `Day ${point.day}`}</span>
-          {point.context && (
-            <span className="text-xs font-semibold capitalize text-ink-muted">{point.context.replace("_", " ")}</span>
-          )}
+      <div lang="bn" className="min-w-[200px] space-y-2 rounded-2xl bg-white p-3 text-base shadow-soft">
+        <div className="flex items-center justify-between gap-2 border-b border-line pb-1.5 font-bold text-ink">
+          <span>দিন {toBanglaDigits(point.day)}</span>
+          {contextLabel && <span className="text-sm font-semibold text-ink-muted">{contextLabel}</span>}
         </div>
 
-        {actualVal !== null && actualVal !== undefined ? (
-          <div className="flex items-center justify-between">
-            <span className="text-ink-muted">Reading</span>
+        {actualVal !== null ? (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-ink-muted">আপনার সুগার</span>
             <span className={`font-bold ${isInRange ? "text-risk-safeInk" : "text-risk-cautionInk"}`}>
-              {actualVal} <span className="text-xs font-normal text-ink-muted">mg/dL</span>
+              {toBanglaDigits(actualVal)} <span className="text-sm font-normal text-ink-muted">mmol/L</span>
             </span>
           </div>
         ) : (
-          <div className="text-ink-muted">No reading this day</div>
+          <div className="text-ink-muted">এই দিনে মাপা হয়নি</div>
         )}
 
-        <div className="flex items-center justify-between">
-          <span className="text-ink-muted">Target</span>
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-ink-muted">লক্ষ্য</span>
           <span className="font-bold text-pastel-lilac-ink">
-            {targetVal} <span className="text-xs font-normal text-ink-muted">mg/dL</span>
+            {toBanglaDigits(targetVal)} <span className="text-sm font-normal text-ink-muted">mmol/L</span>
           </span>
         </div>
 
         {point.linked_meal && (
-          <div className="border-t border-line pt-1 text-xs text-ink-soft">{point.linked_meal}</div>
+          <div className="border-t border-line pt-1.5 text-sm text-ink-soft">{point.linked_meal}</div>
         )}
       </div>
     );
@@ -75,64 +90,63 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
 }
 
 export default function GlucoseChart({ data, height = 300 }: GlucoseChartProps) {
-  // Ensure we have clean, non-empty data without NaN coordinates
-  const sanitizedData = data.map((d) => ({
+  // Clean data (no NaN coordinates) and convert mg/dL → mmol/L for display only
+  const chartData: ChartPoint[] = data.map((d) => ({
     ...d,
-    actual: typeof d.actual === "number" && !isNaN(d.actual) ? d.actual : null,
-    target: typeof d.target === "number" && !isNaN(d.target) ? d.target : 100,
+    actual: typeof d.actual === "number" && !isNaN(d.actual) ? toMmol(d.actual) : null,
+    target: toMmol(typeof d.target === "number" && !isNaN(d.target) ? d.target : 100),
   }));
 
   return (
-    <div className="card relative w-full p-4">
-      {/* Chart Title and Safe Zone Indicator */}
+    <div lang="bn" className="card relative w-full p-4">
+      {/* Chart title and legend */}
       <div className="mb-3 space-y-2">
-        <h2 className="text-base font-bold text-ink">Trend</h2>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold text-ink-soft">
-          <div className="flex items-center gap-1.5">
-            <span className="inline-block h-1.5 w-3 rounded-full bg-pastel-blue-strong"></span>
-            <span>Your readings</span>
+        <h2 className="text-lg font-bold text-ink">সুগার কেমন যাচ্ছে</h2>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-base font-semibold text-ink-soft">
+          <div className="flex items-center gap-2">
+            <span className="inline-block h-2 w-4 rounded-full bg-pastel-blue-strong"></span>
+            <span>আপনার সুগার</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="inline-block h-1 w-3 border-b-2 border-dashed border-pastel-lilac-strong"></span>
-            <span>Target path</span>
+          <div className="flex items-center gap-2">
+            <span className="inline-block h-1 w-4 border-b-2 border-dashed border-pastel-lilac-strong"></span>
+            <span>লক্ষ্যের পথ</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="inline-block h-2.5 w-2.5 rounded bg-pastel-lime"></span>
-            <span>Healthy range</span>
+          <div className="flex items-center gap-2">
+            <span className="inline-block h-3 w-3 rounded bg-pastel-lime"></span>
+            <span>ভালো সীমা</span>
           </div>
         </div>
       </div>
 
-      {/* Recharts Container */}
+      {/* Recharts container */}
       <div style={{ width: "100%", height }}>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart
-            data={sanitizedData}
-            margin={{ top: 15, right: 15, left: -15, bottom: 5 }}
-          >
+          <LineChart data={chartData} margin={{ top: 15, right: 15, left: -10, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#EEECE4" vertical={false} />
 
             <XAxis
-              dataKey="date_label"
+              dataKey="day"
               stroke="#8A8E95"
-              fontSize={11}
+              fontSize={14}
               tickLine={false}
               axisLine={false}
+              tickFormatter={(day: number) => `দিন ${toBanglaDigits(day)}`}
             />
 
             <YAxis
-              domain={[60, 180]}
+              domain={Y_DOMAIN_MMOL}
               stroke="#8A8E95"
-              fontSize={11}
+              fontSize={14}
               tickLine={false}
               axisLine={false}
-              ticks={[70, 100, 140, 160, 180]}
+              ticks={Y_TICKS_MMOL}
+              tickFormatter={(v: number) => toBanglaDigits(v)}
             />
 
-            {/* TC-P5-02 Reference Area: Green Safe Zone (70 - 140 mg/dL) */}
+            {/* TC-P5-02 reference area: green safe zone 3.9–7.8 mmol/L (= 70–140 mg/dL) */}
             <ReferenceArea
-              y1={70}
-              y2={140}
+              y1={SAFE_BAND_MMOL.min}
+              y2={SAFE_BAND_MMOL.max}
               fill="#E1ECB2"
               fillOpacity={0.6}
               stroke="none"
@@ -140,23 +154,23 @@ export default function GlucoseChart({ data, height = 300 }: GlucoseChartProps) 
 
             <Tooltip content={<CustomTooltip />} cursor={{ stroke: "#E6E3D8" }} />
 
-            {/* Line 1: Actual Patient Readings (Solid Blue Line) */}
+            {/* Line 1: patient readings (solid blue) */}
             <Line
               type="monotone"
               dataKey="actual"
-              name="Actual Reading"
+              name="আপনার সুগার"
               stroke="#7FA7EE"
               strokeWidth={3}
-              dot={{ r: 4, fill: "#7FA7EE", strokeWidth: 2, stroke: "#FFFFFF" }}
-              activeDot={{ r: 6, fill: "#7FA7EE", stroke: "#FFFFFF", strokeWidth: 2 }}
+              dot={{ r: 5, fill: "#7FA7EE", strokeWidth: 2, stroke: "#FFFFFF" }}
+              activeDot={{ r: 7, fill: "#7FA7EE", stroke: "#FFFFFF", strokeWidth: 2 }}
               connectNulls={true}
             />
 
-            {/* Line 2: AI Predicted Target Line (Purple Dashed Line) */}
+            {/* Line 2: target path (purple dashed) */}
             <Line
               type="linear"
               dataKey="target"
-              name="Predicted Target"
+              name="লক্ষ্যের পথ"
               stroke="#9F88EA"
               strokeWidth={2}
               strokeDasharray="5 5"
@@ -166,7 +180,7 @@ export default function GlucoseChart({ data, height = 300 }: GlucoseChartProps) 
         </ResponsiveContainer>
       </div>
 
-      <p className="mt-2 text-xs font-medium text-ink-muted">Healthy range is 70–140 mg/dL.</p>
+      <p className="mt-2 text-base font-medium text-ink-muted">ভালো সীমা: ৩.৯–৭.৮ mmol/L</p>
     </div>
   );
 }

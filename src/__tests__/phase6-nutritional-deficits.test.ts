@@ -209,7 +209,7 @@ describe('Phase 6: Nutritional Gap & Deficiency Recommendation Engine', () => {
       // Assert badge is visible in DOM
       const badge = screen.getByTestId('fiber-badge');
       expect(badge).toBeTruthy();
-      expect(badge.textContent).toContain('Fiber Shield Adequate');
+      expect(badge.textContent).toContain('আঁশ যথেষ্ট আছে'); // Bangla display of 'Fiber Shield Adequate'
     });
 
     it('TC-P6-02 DOM: clicking "+ Add to Bazaar List" on Okra / Dherosh triggers cart callback with correct item', async () => {
@@ -224,7 +224,7 @@ describe('Phase 6: Nutritional Gap & Deficiency Recommendation Engine', () => {
       // Find the button with + Add to Bazaar List
       const button = screen.getByTestId(`add-to-cart-${okra.id}`);
       expect(button).toBeTruthy();
-      expect(button.textContent).toContain('+ Add to Bazaar List');
+      expect(button.textContent).toContain('+ বাজারের তালিকায় যোগ করুন'); // Bangla '+ Add to Bazaar List'
 
       // Click button
       fireEvent.click(button);

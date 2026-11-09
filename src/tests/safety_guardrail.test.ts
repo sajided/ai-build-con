@@ -119,8 +119,9 @@ describe('Phase 7: Clinical Safety Guardrail Engine (TC-P7-01)', () => {
 
       // Check emergency call button
       const emergencyBtn = screen.getByTestId('emergency-call-button');
-      expect(emergencyBtn.getAttribute('href')).toBe('tel:911');
-      expect(emergencyBtn.textContent).toContain('Call Emergency (911)');
+      // Bangladesh national emergency number
+      expect(emergencyBtn.getAttribute('href')).toBe('tel:999');
+      expect(emergencyBtn.textContent).toContain('জরুরি ফোন (৯৯৯)');
     });
   });
 

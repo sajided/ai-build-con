@@ -4,6 +4,7 @@ import React, { useState, useRef } from "react";
 import Link from "next/link";
 import {
   Utensils,
+  ScanLine,
   Camera,
   ShieldCheck,
   AlertTriangle,
@@ -13,12 +14,11 @@ import {
   RefreshCw,
   Maximize2,
   X,
-  ShoppingBasket,
   Search,
-  Sparkles,
 } from "lucide-react";
 import type { MenuItem, MenuScanResponse } from "@/lib/validations/menusafe";
 import PageHeader from "@/components/app/PageHeader";
+import { toBanglaDigits } from "@/lib/assistant/bangla";
 
 export default function MenuSafePage() {
   const [textInput, setTextInput] = useState<string>("");
@@ -58,12 +58,12 @@ export default function MenuSafePage() {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.message || data.error || "Menu scan failed");
+        throw new Error(data.message || data.error || "কিছু একটা সমস্যা হয়েছে। আবার চেষ্টা করুন।");
       }
 
       setScanResult(data);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to scan menu.");
+      setError(err instanceof Error ? err.message : "কিছু একটা সমস্যা হয়েছে। আবার চেষ্টা করুন।");
     } finally {
       setIsScanning(false);
     }
@@ -101,7 +101,7 @@ export default function MenuSafePage() {
     const riskInk =
       tone === "red" ? "text-risk-dangerInk" : tone === "yellow" ? "text-risk-cautionInk" : "text-risk-safeInk";
     const RiskIcon = tone === "red" ? AlertTriangle : tone === "yellow" ? CircleAlert : ShieldCheck;
-    const riskLabel = tone === "red" ? "High spike risk" : tone === "yellow" ? "Eat with care · small portion" : "Good choice";
+    const riskLabel = tone === "red" ? "এড়িয়ে চলুন" : tone === "yellow" ? "অল্প খান" : "ভালো";
 
     return (
       <div key={item.id} className="card space-y-3 p-4">
@@ -110,17 +110,17 @@ export default function MenuSafePage() {
             <RiskIcon className="h-5 w-5" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-base font-bold leading-snug text-ink">{item.dish_name}</p>
-            <p className={`text-xs font-bold ${riskInk}`}>{riskLabel}</p>
+            <p className="text-lg font-bold leading-snug text-ink">{item.dish_name}</p>
+            <p className={`text-base font-bold ${riskInk}`}>{riskLabel}</p>
           </div>
         </div>
 
         {chips && chips.length > 0 && (
           <div className="space-y-1.5">
-            <p className="section-title">{risky ? "Hidden sugars & starches" : "What makes it a good pick"}</p>
+            <p className="section-title text-base">{risky ? "লুকানো চিনি ও শর্করা" : "কেন এটা ভালো"}</p>
             <div className="flex flex-wrap gap-1.5">
               {chips.map((chip, idx) => (
-                <span key={idx} className={`rounded-full px-3 py-1 text-xs font-bold ${riskBg} ${riskInk}`}>
+                <span key={idx} className={`rounded-full px-3 py-1 text-sm font-bold ${riskBg} ${riskInk}`}>
                   {risky ? "⚠ " : "✓ "}
                   {chip}
                 </span>
@@ -129,16 +129,16 @@ export default function MenuSafePage() {
           </div>
         )}
 
-        <p className="text-sm leading-relaxed text-ink-soft">{item.clinical_rationale}</p>
+        <p className="text-base leading-relaxed text-ink-soft">{item.clinical_rationale}</p>
 
         {/* Waiter script (TC-P4-02) */}
         <div className="space-y-2.5 rounded-2xl bg-pastel-blue/50 p-3.5 text-pastel-blue-ink">
-          <p className="text-xs font-bold">{risky ? "Ask your waiter" : "Tip for your waiter"}</p>
-          <p className="text-sm font-semibold italic leading-relaxed">&ldquo;{item.waiter_script}&rdquo;</p>
+          <p className="text-base font-bold">{risky ? "ওয়েটারকে বলুন" : "ওয়েটারকে বলতে পারেন"}</p>
+          <p lang="en" className="text-base font-semibold italic leading-relaxed">&ldquo;{item.waiter_script}&rdquo;</p>
 
           {risky && item.suggested_side_swap && (
-            <p className="text-sm">
-              <span className="font-bold">Swap: </span>
+            <p className="text-base">
+              <span className="font-bold">বদলে নিন: </span>
               {item.suggested_side_swap}
             </p>
           )}
@@ -147,27 +147,27 @@ export default function MenuSafePage() {
             <button
               type="button"
               onClick={() => handleCopyScript(item)}
-              className="flex h-11 items-center justify-center gap-1.5 rounded-full bg-white text-sm font-bold text-ink active:bg-canvas"
+              className="flex h-12 items-center justify-center gap-1.5 rounded-full bg-white text-base font-bold text-ink active:bg-canvas"
             >
               {copied ? (
                 <>
-                  <Check className="h-4 w-4 text-risk-safeInk" />
-                  <span className="text-risk-safeInk">Copied</span>
+                  <Check className="h-5 w-5 text-risk-safeInk" />
+                  <span className="text-risk-safeInk">কপি হয়েছে</span>
                 </>
               ) : (
                 <>
-                  <Copy className="h-4 w-4" />
-                  Copy
+                  <Copy className="h-5 w-5" />
+                  কপি করুন
                 </>
               )}
             </button>
             <button
               type="button"
               onClick={() => setShowWaiterModalItem(item)}
-              className="flex h-11 items-center justify-center gap-1.5 rounded-full bg-white text-sm font-bold text-ink active:bg-canvas"
+              className="flex h-12 items-center justify-center gap-1.5 rounded-full bg-white text-base font-bold text-ink active:bg-canvas"
             >
-              <Maximize2 className="h-4 w-4" />
-              Show waiter
+              <Maximize2 className="h-5 w-5" />
+              ওয়েটারকে দেখান
             </button>
           </div>
         </div>
@@ -180,10 +180,10 @@ export default function MenuSafePage() {
         >
           {selected ? (
             <>
-              <Check className="h-5 w-5" /> Ordering
+              <Check className="h-5 w-5" /> এটা খাচ্ছি
             </>
           ) : (
-            "I'm having this"
+            "আমি এটা খাব"
           )}
         </button>
       </div>
@@ -192,32 +192,25 @@ export default function MenuSafePage() {
 
   return (
     <>
-      <PageHeader title="Scan" subtitle="Check foods before you buy or order" />
+      <PageHeader title="স্ক্যান" subtitle="কেনা বা অর্ডারের আগে খাবার দেখে নিন" />
 
-      <main className="px-4 py-4 space-y-5">
-        {/* Groceries / Menu / Live Voice segmented control */}
-        <div className="grid grid-cols-3 gap-1 rounded-full bg-white p-1 shadow-soft">
+      <main lang="bn" className="px-4 py-4 space-y-5">
+        {/* Live scan / Restaurant menu segmented control */}
+        <div className="grid grid-cols-2 gap-1 rounded-full bg-white p-1 shadow-soft">
           <Link
             href="/scanner"
-            className="flex h-11 items-center justify-center gap-1.5 rounded-full text-xs font-semibold text-ink-soft active:bg-canvas"
+            className="flex h-12 items-center justify-center gap-2 rounded-full px-3 text-base font-semibold text-ink-soft active:bg-canvas"
           >
-            <ShoppingBasket className="h-4 w-4" />
-            Groceries
+            <ScanLine className="h-5 w-5 shrink-0" />
+            লাইভ স্ক্যান
           </Link>
           <span
             aria-current="page"
-            className="flex h-11 items-center justify-center gap-1.5 rounded-full bg-ink text-xs font-bold text-white"
+            className="flex h-12 items-center justify-center gap-2 rounded-full bg-ink px-3 text-base font-bold text-white"
           >
-            <Utensils className="h-4 w-4" />
-            Menu
+            <Utensils className="h-5 w-5 shrink-0" />
+            রেস্তোরাঁর মেনু
           </span>
-          <Link
-            href="/live"
-            className="flex h-11 items-center justify-center gap-1.5 rounded-full text-xs font-semibold text-emerald-700 bg-emerald-50 active:bg-emerald-100"
-          >
-            <Sparkles className="h-4 w-4 text-emerald-600" />
-            Live Voice
-          </Link>
         </div>
 
         {/* Photo upload */}
@@ -238,7 +231,7 @@ export default function MenuSafePage() {
           {imagePreview ? (
             <span className="block h-36 w-full overflow-hidden rounded-2xl">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={imagePreview} alt="Menu photo" className="h-full w-full object-cover" />
+              <img src={imagePreview} alt="মেনুর ছবি" className="h-full w-full object-cover" />
             </span>
           ) : (
             <span className="fab h-16 w-16 bg-pastel-peach-strong">
@@ -247,11 +240,11 @@ export default function MenuSafePage() {
           )}
           <span>
             <span className="block text-lg font-extrabold">
-              {imagePreview ? "Use a different photo" : "Take a photo of the menu"}
+              {imagePreview ? "অন্য ছবি তুলুন" : "মেনুর ছবি তুলুন"}
             </span>
             {!imagePreview && (
-              <span className="mt-1 block text-sm font-semibold opacity-80">
-                We&apos;ll flag dishes with hidden sugars and starches
+              <span className="mt-1 block text-base font-semibold opacity-80">
+                কোন খাবারে লুকানো চিনি বা শর্করা আছে, আমরা দেখিয়ে দেব
               </span>
             )}
           </span>
@@ -259,8 +252,8 @@ export default function MenuSafePage() {
 
         {/* Text input */}
         <div className="space-y-2">
-          <label htmlFor="menu-text" className="section-title">
-            Or type a dish name
+          <label htmlFor="menu-text" className="section-title text-base">
+            অথবা খাবারের নাম লিখুন
           </label>
           <div className="flex gap-2">
             <input
@@ -274,14 +267,14 @@ export default function MenuSafePage() {
                   executeScan({ text: textInput });
                 }
               }}
-              placeholder="e.g. Honey glazed chicken"
+              placeholder="যেমন: কাচ্চি বিরিয়ানি"
               className="input min-w-0 flex-1"
             />
             <button
               type="button"
               onClick={() => textInput.trim() && executeScan({ text: textInput })}
               disabled={isScanning || !textInput.trim()}
-              aria-label="Check dish"
+              aria-label="খাবারটি দেখুন"
               className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-ink text-white active:bg-black disabled:opacity-40"
             >
               <Search className="h-5 w-5" />
@@ -291,37 +284,37 @@ export default function MenuSafePage() {
 
         {/* Example dishes (TC-P4-01 presets) */}
         <div className="space-y-2">
-          <p className="section-title">Try an example</p>
+          <p className="section-title text-base">উদাহরণ দেখুন</p>
           <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
             <button
               type="button"
               onClick={() => handlePreset("Crispy Honey Glazed Chicken in Sweet Corn Gravy")}
-              className="chip-toggle shrink-0"
+              className="chip-toggle h-12 shrink-0 text-base"
             >
-              <AlertTriangle className="h-4 w-4 text-pastel-coral-strong" />
-              Honey glazed chicken
+              <AlertTriangle className="h-5 w-5 text-pastel-coral-strong" />
+              মধু-চিকেন
             </button>
             <button
               type="button"
               onClick={() => handlePreset("Tandoori Grilled Fish with Mint Yoghurt & Steamed Broccoli")}
-              className="chip-toggle shrink-0"
+              className="chip-toggle h-12 shrink-0 text-base"
             >
-              <ShieldCheck className="h-4 w-4 text-pastel-lime-strong" />
-              Tandoori grilled fish
+              <ShieldCheck className="h-5 w-5 text-pastel-lime-strong" />
+              তন্দুরি মাছ
             </button>
           </div>
         </div>
 
         {isScanning && (
-          <div className="card flex items-center justify-center gap-3 p-4 text-sm font-bold text-ink">
-            <RefreshCw className="h-4 w-4 animate-spin text-pastel-peach-strong" />
-            <span>Reading the menu…</span>
+          <div className="card flex items-center justify-center gap-3 p-4 text-base font-bold text-ink">
+            <RefreshCw className="h-5 w-5 animate-spin text-pastel-peach-strong" />
+            <span>একটু অপেক্ষা করুন…</span>
           </div>
         )}
 
         {error && (
-          <div className="flex items-start gap-2 rounded-2xl bg-risk-danger p-4 text-sm font-semibold text-risk-dangerInk">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div className="flex items-start gap-2 rounded-2xl bg-risk-danger p-4 text-base font-semibold text-risk-dangerInk">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
             <span>{error}</span>
           </div>
         )}
@@ -335,18 +328,18 @@ export default function MenuSafePage() {
                   <ShieldCheck className="h-5 w-5" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="font-bold text-ink">Summary</p>
-                  <p className="truncate text-xs font-semibold text-ink-muted">{scanResult.restaurant_type}</p>
+                  <p className="text-lg font-bold text-ink">সারসংক্ষেপ</p>
+                  <p className="truncate text-sm font-semibold text-ink-muted">{scanResult.restaurant_type}</p>
                 </div>
               </div>
-              <p className="text-sm leading-relaxed text-ink-soft">{scanResult.overall_menu_verdict}</p>
+              <p className="text-base leading-relaxed text-ink-soft">{scanResult.overall_menu_verdict}</p>
             </div>
 
             {scanResult.risky_traps.length > 0 && (
               <div className="space-y-3">
-                <h2 className="section-title flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-pastel-coral-strong" />
-                  Watch out ({scanResult.risky_traps.length})
+                <h2 className="flex items-center gap-2 text-lg font-bold text-ink">
+                  <AlertTriangle className="h-5 w-5 text-pastel-coral-strong" />
+                  এড়িয়ে চলুন ({toBanglaDigits(scanResult.risky_traps.length)})
                 </h2>
                 {scanResult.risky_traps.map((item) => renderDish(item))}
               </div>
@@ -354,9 +347,9 @@ export default function MenuSafePage() {
 
             {scanResult.caution_items.length > 0 && (
               <div className="space-y-3">
-                <h2 className="section-title flex items-center gap-2">
-                  <CircleAlert className="h-4 w-4 text-pastel-peach-strong" />
-                  Eat with care ({scanResult.caution_items.length})
+                <h2 className="flex items-center gap-2 text-lg font-bold text-ink">
+                  <CircleAlert className="h-5 w-5 text-pastel-peach-strong" />
+                  অল্প খান ({toBanglaDigits(scanResult.caution_items.length)})
                 </h2>
                 {scanResult.caution_items.map((item) => renderDish(item))}
               </div>
@@ -364,9 +357,9 @@ export default function MenuSafePage() {
 
             {scanResult.safe_selections.length > 0 && (
               <div className="space-y-3">
-                <h2 className="section-title flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4 text-pastel-lime-strong" />
-                  Good choices ({scanResult.safe_selections.length})
+                <h2 className="flex items-center gap-2 text-lg font-bold text-ink">
+                  <ShieldCheck className="h-5 w-5 text-pastel-lime-strong" />
+                  ভালো ({toBanglaDigits(scanResult.safe_selections.length)})
                 </h2>
                 {scanResult.safe_selections.map((item) => renderDish(item))}
               </div>
@@ -384,36 +377,37 @@ export default function MenuSafePage() {
           <div
             role="dialog"
             aria-modal="true"
-            aria-label="Show to waiter"
+            aria-label="ওয়েটারকে দেখান"
+            lang="bn"
             onClick={(e) => e.stopPropagation()}
             className="w-full max-w-md space-y-5 rounded-t-[32px] bg-white p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] text-ink shadow-float animate-in slide-in-from-bottom"
           >
             <div className="mx-auto h-1.5 w-12 rounded-full bg-line" />
             <div className="flex items-center justify-between">
-              <span className="section-title">Show this to your waiter</span>
+              <span className="text-base font-bold text-ink-muted">ওয়েটারকে এটা দেখান</span>
               <button
                 type="button"
                 onClick={() => setShowWaiterModalItem(null)}
-                aria-label="Close"
-                className="flex h-10 w-10 items-center justify-center rounded-full text-ink active:bg-canvas"
+                aria-label="বন্ধ করুন"
+                className="flex h-12 w-12 items-center justify-center rounded-full text-ink active:bg-canvas"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             <div className="space-y-2">
-              <p className="text-sm font-bold text-ink-soft">{showWaiterModalItem.dish_name}</p>
-              <p className="text-2xl font-extrabold leading-snug text-ink">
+              <p className="text-base font-bold text-ink-soft">{showWaiterModalItem.dish_name}</p>
+              <p lang="en" className="text-2xl font-extrabold leading-snug text-ink">
                 &ldquo;{showWaiterModalItem.waiter_script}&rdquo;
               </p>
             </div>
 
-            <p className="border-t border-line pt-3 text-sm text-ink-muted">
+            <p lang="en" className="border-t border-line pt-3 text-base text-ink-muted">
               I&apos;m diabetic — thank you for helping me order safely!
             </p>
 
             <button type="button" onClick={() => setShowWaiterModalItem(null)} className="btn-primary">
-              Done
+              বন্ধ করুন
             </button>
           </div>
         </div>

@@ -7,10 +7,20 @@ import PageHeader from '@/components/app/PageHeader';
 import { useBazaarCart } from '@/lib/cart/bazaar-cart';
 import { DeficienciesResponse } from '@/lib/validations/deficits';
 import { NutrientProgressMeter } from '@/components/deficits/NutrientProgressMeter';
-import { BazaarStapleCard } from '@/components/deficits/BazaarStapleCard';
+import { BazaarStapleCard, stapleNameBn } from '@/components/deficits/BazaarStapleCard';
+import { toBanglaDigits } from '@/lib/assistant/bangla';
 import { BazaarCartDrawer } from '@/components/deficits/BazaarCartDrawer';
 
 type BenchmarkPreset = 'deficit_14' | 'optimal_32' | 'custom';
+
+/** Plain-Bangla summary built from the analysis numbers (engine text stays English) */
+function summaryBn(analysis: DeficienciesResponse): string {
+  if (analysis.fiberStatus === 'optimal') {
+    return 'গত ৭ দিনে আপনি যথেষ্ট আঁশ খেয়েছেন। এভাবেই শাক-সবজি খেতে থাকুন।';
+  }
+  const gap = toBanglaDigits(Math.abs(analysis.fiberDifference));
+  return `গত ৭ দিনে রোজ ${gap} গ্রাম আঁশ কম খেয়েছেন। ঢেঁড়শ, তিসি আর ইসবগুল খেলে খাওয়ার পরে সুগার কম বাড়বে।`;
+}
 
 export default function DeficitsPage() {
   const {
@@ -96,8 +106,21 @@ export default function DeficitsPage() {
     loadAnalysis('custom', val);
   };
 
+  // The cart hook emits English toasts; show them in Bangla
+  const toastBn = (() => {
+    if (!toastMessage) return null;
+    const added = toastMessage.match(/^Added (.+) to Local Bazaar List!$/);
+    if (added) {
+      const item = cart.find((ci) => ci.item.name === added[1])?.item
+        ?? analysis?.recommendations.find((r) => r.name === added[1]);
+      return `${item ? stapleNameBn(item) : added[1]} বাজারের তালিকায় যোগ হয়েছে`;
+    }
+    if (toastMessage.startsWith('Cleared')) return 'বাজারের তালিকা খালি করা হয়েছে';
+    return toastMessage;
+  })();
+
   return (
-    <>
+    <div lang="bn">
       {/* Toast Notification (TC-P6-02 verification) — sits just above the bottom nav */}
       {toastMessage && (
         <div
@@ -106,37 +129,37 @@ export default function DeficitsPage() {
           className="fixed inset-x-0 bottom-[calc(6.25rem+env(safe-area-inset-bottom))] z-50 mx-auto flex w-full max-w-md justify-center px-4"
         >
           <div className="flex items-center gap-2.5 rounded-full bg-ink py-3 pl-3 pr-5 shadow-float animate-in fade-in">
-            <CheckCircle2 className="h-5 w-5 shrink-0 text-pastel-lime" />
-            <p className="text-sm font-bold text-white">{toastMessage}</p>
+            <CheckCircle2 className="h-6 w-6 shrink-0 text-pastel-lime" />
+            <p className="text-base font-bold text-white">{toastBn}</p>
           </div>
         </div>
       )}
 
       <PageHeader
-        title="Nutrition"
-        subtitle="Last 7 days"
+        title="পুষ্টি"
+        subtitle="গত ৭ দিন"
         actions={
           <button
             type="button"
             data-testid="open-cart-button"
             onClick={() => setIsDrawerOpen(true)}
-            aria-label="Shopping list"
-            className="relative flex h-11 w-11 items-center justify-center rounded-full bg-white text-ink shadow-soft active:bg-canvas"
+            aria-label="বাজারের তালিকা"
+            className="relative flex h-12 w-12 items-center justify-center rounded-full bg-white text-ink shadow-soft active:bg-canvas"
           >
-            <ShoppingBag className="h-5 w-5" />
+            <ShoppingBag className="h-6 w-6" />
             {totalItemCount > 0 && (
               <span
                 data-testid="cart-badge-count"
-                className="absolute -right-1 -top-1 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-pastel-coral-strong px-1.5 text-xs font-bold text-white"
+                className="absolute -right-1 -top-1 inline-flex h-6 min-w-[24px] items-center justify-center rounded-full bg-pastel-coral-strong px-1.5 text-sm font-bold text-white"
               >
-                {totalItemCount}
+                {toBanglaDigits(totalItemCount)}
               </span>
             )}
           </button>
         }
       />
 
-      <main className="space-y-6 px-4 pb-5 pt-2">
+      <main lang="bn" className="space-y-6 px-4 pb-5 pt-2">
         {/* Sample data selector (TC-P6-01 verification buttons) */}
         <section className="space-y-3">
           <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
@@ -145,28 +168,28 @@ export default function DeficitsPage() {
               data-testid="preset-deficit-14"
               onClick={() => handlePresetSelect('deficit_14')}
               aria-pressed={activePreset === 'deficit_14'}
-              className="chip-toggle shrink-0"
+              className="chip-toggle h-12 shrink-0 text-base"
             >
-              Sample: low-fibre week
+              নমুনা: আঁশ কম খাওয়া সপ্তাহ
             </button>
             <button
               type="button"
               data-testid="preset-optimal-32"
               onClick={() => handlePresetSelect('optimal_32')}
               aria-pressed={activePreset === 'optimal_32'}
-              className="chip-toggle shrink-0"
+              className="chip-toggle h-12 shrink-0 text-base"
             >
-              Sample: balanced week
+              নমুনা: ঠিকঠাক খাওয়া সপ্তাহ
             </button>
           </div>
 
           <div className="card p-4">
             <div className="flex items-baseline justify-between">
-              <label htmlFor="fiber-slider" className="text-sm font-bold text-ink">
-                Daily fibre
+              <label htmlFor="fiber-slider" className="text-lg font-bold text-ink">
+                রোজ কত আঁশ খান
               </label>
-              <span className="text-base font-extrabold text-ink">
-                {sliderFiber} g <span className="text-sm font-semibold text-ink-muted">/ 30 g goal</span>
+              <span className="text-xl font-bold text-ink">
+                {toBanglaDigits(sliderFiber)} গ্রাম <span className="text-base font-semibold text-ink-muted">/ লক্ষ্য ৩০</span>
               </span>
             </div>
             <input
@@ -177,12 +200,13 @@ export default function DeficitsPage() {
               step="1"
               value={sliderFiber}
               onChange={handleSliderChange}
-              className="mt-4 h-2 w-full cursor-pointer appearance-none rounded-full bg-pastel-lime accent-ink"
+              aria-valuetext={`${toBanglaDigits(sliderFiber)} গ্রাম`}
+              className="mt-4 h-12 w-full cursor-pointer accent-ink"
             />
-            <div className="mt-2 flex justify-between text-xs font-semibold text-ink-muted">
-              <span>5 g</span>
-              <span className="text-pastel-lime-ink">30 g goal</span>
-              <span>45 g</span>
+            <div className="mt-1 flex justify-between text-base font-semibold text-ink-muted">
+              <span>৫ গ্রাম</span>
+              <span className="text-pastel-lime-ink">লক্ষ্য ৩০ গ্রাম</span>
+              <span>৪৫ গ্রাম</span>
             </div>
           </div>
         </section>
@@ -190,15 +214,15 @@ export default function DeficitsPage() {
         {/* Nutritional Deficit Meters */}
         <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="section-title">Your intake vs goals</h2>
-            {isLoading && <RefreshCw className="h-4 w-4 animate-spin text-ink-muted" />}
+            <h2 className="text-lg font-bold text-ink">আপনি কতটা খাচ্ছেন</h2>
+            {isLoading && <RefreshCw className="h-5 w-5 animate-spin text-ink-muted" aria-label="একটু অপেক্ষা করুন…" />}
           </div>
 
           {analysis ? (
             <NutrientProgressMeter metrics={analysis.metrics} />
           ) : (
-            <div className="card p-8 text-center text-sm text-ink-muted">
-              Loading your nutrition…
+            <div className="card p-8 text-center text-base text-ink-muted">
+              একটু অপেক্ষা করুন…
             </div>
           )}
         </section>
@@ -211,17 +235,17 @@ export default function DeficitsPage() {
           >
             <div className="flex items-start gap-3">
               <div className="icon-badge bg-white/85 text-pastel-peach-ink">
-                <Sparkles className="h-5 w-5" />
+                <Sparkles className="h-6 w-6" />
               </div>
               <div>
-                <h3 className="mb-1 text-base font-extrabold">What this means</h3>
-                <p className="text-sm font-medium leading-relaxed">{analysis.summaryStatement}</p>
+                <h3 className="mb-1 text-lg font-bold">এর মানে কী</h3>
+                <p className="text-base font-medium leading-relaxed">{summaryBn(analysis)}</p>
                 <Link
                   href="/telemetry"
-                  className="chip mt-3 h-11 px-4"
+                  className="chip mt-3 h-12 px-4 text-base"
                 >
-                  <TrendingUp className="h-4 w-4" />
-                  <span>See your glucose trend</span>
+                  <TrendingUp className="h-5 w-5" />
+                  <span>সুগার কেমন যাচ্ছে দেখুন</span>
                 </Link>
               </div>
             </div>
@@ -231,8 +255,8 @@ export default function DeficitsPage() {
         {/* Recommendations */}
         <section className="space-y-3">
           <div>
-            <h2 className="section-title">Foods to add</h2>
-            <p className="text-sm text-ink-soft">Low-GI local staples that help close the gap</p>
+            <h2 className="text-lg font-bold text-ink">এই খাবারগুলো খান</h2>
+            <p className="text-base text-ink-soft">দেশি খাবার, সুগার ধীরে বাড়ায়, আঁশের ঘাটতি পূরণ করে</p>
           </div>
 
           {analysis?.recommendations && (
@@ -257,6 +281,6 @@ export default function DeficitsPage() {
         onClearCart={clearCart}
         getExportText={getExportText}
       />
-    </>
+    </div>
   );
 }

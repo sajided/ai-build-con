@@ -32,10 +32,10 @@
     @apply relative overflow-hidden rounded-[28px] p-4;
   }
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-full bg-white/85 px-3 py-1.5 text-sm font-semibold text-ink shadow-sm;
+    @apply inline-flex items-center gap-1.5 rounded-full bg-white/85 px-3 py-1.5 text-base font-semibold text-ink shadow-sm;
   }
   .chip-toggle {
-    @apply inline-flex h-10 items-center gap-1.5 rounded-full border border-line bg-white px-4 text-sm font-semibold text-ink-soft transition-colors active:bg-canvas;
+    @apply inline-flex h-12 items-center gap-1.5 rounded-full border border-line bg-white px-4 text-base font-semibold text-ink-soft transition-colors active:bg-canvas;
   }
   .chip-toggle[aria-pressed="true"],
   .chip-toggle[aria-selected="true"],
@@ -55,7 +55,7 @@
     @apply h-12 w-full rounded-2xl border border-line bg-white px-4 text-base text-ink placeholder:text-ink-muted focus:border-pastel-blue-strong focus:outline-none focus:ring-2 focus:ring-pastel-blue;
   }
   .section-title {
-    @apply text-sm font-bold text-ink-muted;
+    @apply text-base font-bold text-ink-muted;
   }
   .icon-badge {
     @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-full;
