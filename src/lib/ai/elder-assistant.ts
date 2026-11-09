@@ -13,6 +13,8 @@ import { shrinkSpeechWav } from "@/lib/assistant/wav";
 export const ASSISTANT_MODELS = ["gemini-2.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.5-flash"];
 export const TTS_MODELS = ["gemini-3.8-flash-lite-tts", "gemini-2.5-flash-preview-tts", "gemini-3.8-flash-tts"];
 const MODEL_TIMEOUT_MS = 9000;
+/** Working TTS models take ~3.5–4.5 s for a short Bangla sentence, longer for long ones */
+const TTS_TIMEOUT_MS = 12000;
 
 export type AssistantMode = "talk" | "meter" | "food";
 
@@ -188,16 +190,13 @@ export async function synthesizeBanglaSpeech(text: string): Promise<Buffer | nul
             speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } },
           },
         }),
-        3000
+        TTS_TIMEOUT_MS
       );
       const audio = response.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data)?.inlineData;
       if (audio?.data) return shrinkSpeechWav(Buffer.from(audio.data, "base64"), audio.mimeType);
     } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      console.warn(`[Elder TTS] ${model} failed:`, errMsg);
-      if (errMsg.includes("429") || errMsg.includes("RESOURCE_EXHAUSTED")) {
-        break;
-      }
+      // Quota (429) is per model, so a rate-limited model is no reason to skip the others
+      console.warn(`[Elder TTS] ${model} failed:`, err instanceof Error ? err.message : String(err));
     }
   }
   return null;

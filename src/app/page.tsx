@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Mic, Square, Loader2, Camera, Droplet, Keyboard, Volume2, Phone, Settings, LayoutGrid, Pill, FileText, ScanLine } from "lucide-react";
+import { Mic, Square, Loader2, Camera, Droplet, Keyboard, Volume2, Phone, Settings, LayoutGrid, Pill, FileText, ScanLine, PlayCircle } from "lucide-react";
 import type { GlucoseLog, MeasurementContext } from "@/lib/validations/telemetry";
 import type { AssistantResult } from "@/lib/ai/elder-assistant";
 import {
@@ -498,6 +498,10 @@ export default function ElderHomePage() {
           <Settings className="h-5 w-5" />
           নাম ও ফোন নম্বর
         </button>
+        <Link href="/demo" className="inline-flex h-12 items-center gap-2 px-1">
+          <PlayCircle className="h-5 w-5" />
+          ডেমো
+        </Link>
         <Link href="/dashboard" className="inline-flex h-12 items-center gap-2 px-1">
           <LayoutGrid className="h-5 w-5" />
           আরও

@@ -8,6 +8,8 @@ const NO_NAV_ROUTES = ["/onboarding", "/~offline", "/scanner", "/live", "/remind
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  // The judges' demo draws its own phone frame and needs the full desktop width
+  if (pathname.startsWith("/demo")) return <>{children}</>;
   // "/" is the simple Bangla voice home, which has its own large controls
   const showNav = pathname !== "/" && !NO_NAV_ROUTES.some((r) => pathname.startsWith(r));
 

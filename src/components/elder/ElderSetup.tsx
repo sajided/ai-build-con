@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { UserRound, Phone } from "lucide-react";
 import type { ElderSettings } from "@/lib/assistant/client";
 import { fromBanglaDigits } from "@/lib/assistant/bangla";
@@ -52,10 +53,14 @@ export default function ElderSetup({ initial, onDone, onCancel }: ElderSetupProp
             <button type="button" disabled={!name.trim()} onClick={() => setStep(2)} className="btn-primary h-16 text-xl">
               পরের ধাপ
             </button>
-            {onCancel && (
+            {onCancel ? (
               <button type="button" onClick={onCancel} className="btn-secondary h-14 text-lg">
                 বাতিল
               </button>
+            ) : (
+              <Link href="/demo" lang="en" className="block h-12 pt-3 text-center text-base font-semibold text-ink-soft underline underline-offset-4">
+                First time here? Watch the 2-minute demo
+              </Link>
             )}
           </div>
         </>

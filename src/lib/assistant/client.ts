@@ -124,6 +124,12 @@ export async function compressImage(file: File, maxSide = 1024, quality = 0.7): 
 
 let currentAudio: HTMLAudioElement | null = null;
 const ttsCache = new Map<string, string>();
+const ttsPending = new Map<string, Promise<string | null>>();
+/** Bumped by every speak()/stopSpeaking() so a slow, older request can't start talking over a newer one */
+let speechGeneration = 0;
+
+/** Neural voice usually takes 3–5 s on a cold request; after that we fall back to the browser voice. */
+const TTS_WAIT_MS = 5000;
 
 function femaleBanglaVoice(): SpeechSynthesisVoice | undefined {
   if (typeof speechSynthesis === "undefined") return undefined;
@@ -144,55 +150,94 @@ export function warmUpVoices() {
 }
 
 export function stopSpeaking() {
+  speechGeneration++;
   if (typeof speechSynthesis !== "undefined") speechSynthesis.cancel();
   if (currentAudio) {
+    currentAudio.onended = null;
     currentAudio.pause();
     currentAudio.currentTime = 0;
   }
   currentAudio = null;
 }
 
+/** Fetches (once) and caches the neural Bangla voice clip for `text`. Shared by speak() and prefetchSpeech(). */
+function fetchTts(text: string): Promise<string | null> {
+  const cached = ttsCache.get(text);
+  if (cached) return Promise.resolve(cached);
+  let pending = ttsPending.get(text);
+  if (!pending) {
+    pending = fetch("/api/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    })
+      .then(async (res) => {
+        if (!res.ok) return null;
+        const url = URL.createObjectURL(await res.blob());
+        ttsCache.set(text, url);
+        return url;
+      })
+      .catch(() => null)
+      .finally(() => ttsPending.delete(text));
+    ttsPending.set(text, pending);
+  }
+  return pending;
+}
+
+/** Warm the voice cache so a later speak(text) starts instantly (used by the judges' demo). */
+export function prefetchSpeech(text: string): Promise<boolean> {
+  if (typeof navigator !== "undefined" && !navigator.onLine) return Promise.resolve(false);
+  return fetchTts(text).then(Boolean);
+}
+
+/** Use a pre-recorded clip (e.g. a static file) whenever speak(text) is called with exactly this text. */
+export function registerSpeechClip(text: string, url: string) {
+  ttsCache.set(text, url);
+}
+
+export interface SpeakOptions {
+  /** Called once when the speech finishes on its own (not when stopped or replaced). */
+  onEnd?: () => void;
+}
+
 /**
  * Speaks Bangla text using an authentic Bangla lady voice.
  * Prioritizes the neural Gemini "Kore" Bangla lady voice from /api/tts.
  * Falls back to browser SpeechSynthesis with high female pitch modulation.
+ * Resolves false if nothing could be spoken (onEnd is then not called).
  */
-export async function speak(text: string): Promise<boolean> {
+export async function speak(text: string, options: SpeakOptions = {}): Promise<boolean> {
   stopSpeaking();
+  const generation = speechGeneration;
+  const stillCurrent = () => generation === speechGeneration;
   if (!text || !text.trim()) return false;
+
+  let ended = false;
+  const finish = () => {
+    if (ended || !stillCurrent()) return;
+    ended = true;
+    options.onEnd?.();
+  };
 
   // 1. Try neural Bangla lady voice via /api/tts when online
   if (typeof navigator === "undefined" || navigator.onLine) {
-    try {
-      let url = ttsCache.get(text);
-      if (!url) {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 1800);
-        try {
-          const res = await fetch("/api/tts", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text }),
-            signal: controller.signal,
-          });
-          clearTimeout(timeout);
-          if (res.ok) {
-            url = URL.createObjectURL(await res.blob());
-            ttsCache.set(text, url);
-          }
-        } catch {
-          clearTimeout(timeout);
-        }
-      }
-
-      if (url) {
+    const url = await Promise.race([
+      fetchTts(text),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), TTS_WAIT_MS)),
+    ]);
+    // A newer speak() or stopSpeaking() happened while we waited
+    if (!stillCurrent()) return false;
+    if (url) {
+      try {
         const audio = new Audio(url);
         currentAudio = audio;
+        audio.onended = finish;
         await audio.play();
         return true;
+      } catch {
+        // Autoplay blocked or bad clip: fall through to browser speech
+        if (!stillCurrent()) return false;
       }
-    } catch {
-      // Fall through to browser speech synthesis
     }
   }
 
@@ -209,6 +254,8 @@ export async function speak(text: string): Promise<boolean> {
       }
       utterance.pitch = 1.25; // Gentle female pitch to prevent deep robotic voice
       utterance.rate = 0.9;   // Clear, warm pacing
+      utterance.onend = finish;
+      utterance.onerror = finish;
       speechSynthesis.speak(utterance);
       return true;
     } catch {
