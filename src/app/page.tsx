@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Mic, Square, Loader2, Camera, Salad, Droplet, Keyboard, Volume2, Phone, Settings, LayoutGrid, Pill, FileText, ScanLine, ChevronRight } from "lucide-react";
+import { Mic, Square, Loader2, Camera, Droplet, Keyboard, Volume2, Phone, Settings, LayoutGrid, Pill, FileText, ScanLine } from "lucide-react";
 import type { GlucoseLog, MeasurementContext } from "@/lib/validations/telemetry";
 import type { AssistantResult } from "@/lib/ai/elder-assistant";
 import {
@@ -46,6 +46,9 @@ import {
 import { alertMessageBn } from "@/lib/care/report";
 
 const MAX_RECORDING_MS = 15000;
+
+const ACTION_TILE =
+  "tile flex min-h-[128px] flex-col items-center justify-center gap-3 text-center active:opacity-80";
 const REMINDER_CHECK_MS = 30000;
 
 type Phase = "idle" | "recording" | "thinking";
@@ -89,7 +92,6 @@ export default function ElderHomePage() {
 
   const recordingRef = useRef<Recording | null>(null);
   const meterInputRef = useRef<HTMLInputElement>(null);
-  const foodInputRef = useRef<HTMLInputElement>(null);
 
   // Everything here depends on the browser (storage, locale, clock), so load after mount
   useEffect(() => {
@@ -393,73 +395,50 @@ export default function ElderHomePage() {
         )}
       </section>
 
-      {/* Photo actions */}
+      {/* Four actions, one style: big tile, icon, short label */}
       <section className="grid grid-cols-2 gap-3">
         <button
           type="button"
           disabled={phase !== "idle"}
           onClick={() => meterInputRef.current?.click()}
-          className="tile flex min-h-[132px] flex-col items-start justify-between bg-pastel-blue text-left text-pastel-blue-ink active:opacity-80 disabled:opacity-60"
+          className={ACTION_TILE + " bg-pastel-blue text-pastel-blue-ink disabled:opacity-60"}
         >
-          <span className="fab bg-pastel-blue-strong">
-            <Camera className="h-5 w-5" />
+          <span className="fab h-14 w-14 bg-pastel-blue-strong">
+            <Camera className="h-7 w-7" />
           </span>
-          <span className="text-xl font-bold leading-snug">সুগার মিটারের ছবি</span>
+          <span className="text-xl font-bold">মিটারের ছবি</span>
         </button>
-        <button
-          type="button"
-          disabled={phase !== "idle"}
-          onClick={() => foodInputRef.current?.click()}
-          className="tile flex min-h-[132px] flex-col items-start justify-between bg-pastel-lime text-left text-pastel-lime-ink active:opacity-80 disabled:opacity-60"
-        >
-          <span className="fab bg-pastel-lime-strong">
-            <Salad className="h-5 w-5" />
+        <Link href="/scanner" className={ACTION_TILE + " bg-pastel-lime text-pastel-lime-ink"}>
+          <span className="fab h-14 w-14 bg-pastel-lime-strong">
+            <ScanLine className="h-7 w-7" />
           </span>
-          <span className="text-xl font-bold leading-snug">খাবারের ছবি</span>
-        </button>
+          <span className="text-xl font-bold">খাবার স্ক্যান</span>
+        </Link>
+        <Link href="/reminders" className={ACTION_TILE + " bg-pastel-lilac text-pastel-lilac-ink"}>
+          <span className="fab h-14 w-14 bg-pastel-lilac-strong">
+            <Pill className="h-7 w-7" />
+          </span>
+          <span className="text-xl font-bold">ওষুধ</span>
+        </Link>
+        <Link href="/report" className={ACTION_TILE + " bg-pastel-peach text-pastel-peach-ink"}>
+          <span className="fab h-14 w-14 bg-pastel-peach-strong">
+            <FileText className="h-7 w-7" />
+          </span>
+          <span className="text-xl font-bold">রিপোর্ট</span>
+        </Link>
         <input ref={meterInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onPhoto("meter")} />
-        <input ref={foodInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onPhoto("food")} />
       </section>
 
+      {/* Fallback when a meter photo doesn't work: quiet, but always there */}
       <button
         type="button"
         disabled={phase !== "idle"}
         onClick={() => setNumberEntry(true)}
-        className="btn-secondary mt-3 h-16 text-xl"
+        className="mx-auto mt-3 inline-flex h-12 items-center gap-2 px-4 text-lg font-semibold text-ink-soft underline-offset-4 active:underline disabled:opacity-60"
       >
-        <Keyboard className="h-6 w-6" />
+        <Keyboard className="h-5 w-5" />
         সুগার নিজে লিখুন
       </button>
-
-      {/* Live scan: groceries, cooked food or a restaurant menu through the camera */}
-      <Link
-        href="/scanner"
-        className="tile mt-3 flex min-h-[96px] items-center gap-4 bg-pastel-peach text-pastel-peach-ink active:opacity-80"
-      >
-        <span className="fab h-14 w-14 bg-pastel-peach-strong">
-          <ScanLine className="h-7 w-7" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-xl font-bold leading-snug">লাইভ স্ক্যান</span>
-          <span className="block text-base font-semibold opacity-80">বাজার, খাবার বা মেনু ক্যামেরায় দেখান</span>
-        </span>
-        <ChevronRight className="h-6 w-6 shrink-0" />
-      </Link>
-
-      <section className="mt-3 grid grid-cols-2 gap-3">
-        <Link href="/reminders" className="card flex min-h-[88px] items-center gap-3 p-4 active:bg-canvas">
-          <span className="icon-badge h-12 w-12 bg-pastel-lilac text-pastel-lilac-ink">
-            <Pill className="h-6 w-6" />
-          </span>
-          <span className="text-lg font-bold leading-snug text-ink">ওষুধ ও মনে করানো</span>
-        </Link>
-        <Link href="/report" className="card flex min-h-[88px] items-center gap-3 p-4 active:bg-canvas">
-          <span className="icon-badge h-12 w-12 bg-pastel-peach text-pastel-peach-ink">
-            <FileText className="h-6 w-6" />
-          </span>
-          <span className="text-lg font-bold leading-snug text-ink">ডাক্তারের রিপোর্ট</span>
-        </Link>
-      </section>
 
       <nav className="mt-5 flex items-center justify-between text-base font-semibold text-ink-muted">
         <button type="button" onClick={() => setEditingSettings(true)} className="inline-flex h-12 items-center gap-2 px-1">
