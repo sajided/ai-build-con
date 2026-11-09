@@ -20,6 +20,7 @@ import type { OnboardingFormData } from "@/lib/validations/onboarding";
 import { calculateTimeInRange } from "@/utils/telemetry";
 import { CONTEXT_LABELS_BN, LEVEL_LABELS_BN, classifyGlucose, greetingBn, toBanglaDigits } from "@/lib/assistant/bangla";
 import ProgressRing from "@/components/app/ProgressRing";
+import SugarInsights from "@/components/dashboard/SugarInsights";
 
 function timeAgo(iso: string) {
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -134,6 +135,9 @@ export default function DashboardPage() {
           </Link>
         </div>
       </header>
+
+      {/* Graphs: trend, time in range, time of day, medicines */}
+      <SugarInsights />
 
       {/* Bento grid */}
       <div className="grid grid-cols-2 gap-3">
