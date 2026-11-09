@@ -5,7 +5,7 @@ import {
   type MenuItem,
   type MenuScanResponse,
 } from "@/lib/validations/menusafe";
-import { auditMenuItem } from "@/lib/ai/menu-auditor";
+import { auditMenuItem, bucketByRisk } from "@/lib/ai/menu-auditor";
 
 /**
  * Benchmark Menu Items for Phase 4 Test Suite (TC-P4-01 & TC-P4-02).
@@ -142,16 +142,21 @@ export async function scanRestaurantMenu(options: {
       const sanitized = sanitizeJson(responseText);
       const parsed = JSON.parse(sanitized);
 
-      // Audit every item deterministically
-      const safe_selections: MenuItem[] = (parsed.safe_selections || []).map((item: Partial<MenuItem>) =>
-        auditMenuItem(item.dish_name || "", item)
-      );
-      const caution_items: MenuItem[] = (parsed.caution_items || []).map((item: Partial<MenuItem>) =>
-        auditMenuItem(item.dish_name || "", item)
-      );
-      const risky_traps: MenuItem[] = (parsed.risky_traps || []).map((item: Partial<MenuItem>) =>
-        auditMenuItem(item.dish_name || "", item)
-      );
+      // Audit every item deterministically. The model's list is treated as its verdict
+      // (so a dish it filed under risky_traps stays at least red), then every dish is
+      // re-sorted by its final audited risk.
+      const withListVerdict = (list: unknown, verdict: MenuItem["risk_category"]): Partial<MenuItem>[] =>
+        (Array.isArray(list) ? list : [])
+          .filter((item): item is Partial<MenuItem> => Boolean(item) && typeof item === "object")
+          .filter((item) => typeof item.dish_name === "string" && item.dish_name.trim().length > 0)
+          .map((item) => ({ ...item, risk_category: verdict }));
+
+      const audited: MenuItem[] = [
+        ...withListVerdict(parsed.safe_selections, "green"),
+        ...withListVerdict(parsed.caution_items, "yellow"),
+        ...withListVerdict(parsed.risky_traps, "red"),
+      ].map((item) => auditMenuItem(item.dish_name || "", item));
+      const { safe_selections, caution_items, risky_traps } = bucketByRisk(audited);
 
       return {
         scanned_at: new Date().toISOString(),
@@ -201,9 +206,7 @@ export async function scanRestaurantMenu(options: {
   return {
     scanned_at: new Date().toISOString(),
     restaurant_type: "Contemporary Dining & Bistro",
-    safe_selections: [audited2],
-    caution_items: [audited3],
-    risky_traps: [audited1],
+    ...bucketByRisk([audited2, audited3, audited1]),
     overall_menu_verdict:
       "Menu contains safe grilled options, but watch out for deep-fried items with honey glazes and cornstarch gravies. Use the discreet waiter scripts to modify your order.",
   };

@@ -7,6 +7,7 @@ import {
   Camera,
   ShieldCheck,
   AlertTriangle,
+  CircleAlert,
   Copy,
   Check,
   RefreshCw,
@@ -89,22 +90,28 @@ export default function MenuSafePage() {
     }
   };
 
-  const renderDish = (item: MenuItem, risky: boolean) => {
+  const renderDish = (item: MenuItem) => {
     const selected = selectedMealId === item.id;
     const copied = copiedScriptId === item.id;
+    // Style each dish by its own audited risk, not by which list it sits in
+    const tone = item.risk_category;
+    const risky = tone !== "green";
     const chips = risky ? item.flagged_traps : item.safe_elements;
-    const riskBg = risky ? "bg-risk-danger" : "bg-risk-safe";
-    const riskInk = risky ? "text-risk-dangerInk" : "text-risk-safeInk";
+    const riskBg = tone === "red" ? "bg-risk-danger" : tone === "yellow" ? "bg-risk-caution" : "bg-risk-safe";
+    const riskInk =
+      tone === "red" ? "text-risk-dangerInk" : tone === "yellow" ? "text-risk-cautionInk" : "text-risk-safeInk";
+    const RiskIcon = tone === "red" ? AlertTriangle : tone === "yellow" ? CircleAlert : ShieldCheck;
+    const riskLabel = tone === "red" ? "High spike risk" : tone === "yellow" ? "Eat with care · small portion" : "Good choice";
 
     return (
       <div key={item.id} className="card space-y-3 p-4">
         <div className="flex items-center gap-3">
           <span className={`icon-badge ${riskBg} ${riskInk}`}>
-            {risky ? <AlertTriangle className="h-5 w-5" /> : <ShieldCheck className="h-5 w-5" />}
+            <RiskIcon className="h-5 w-5" />
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-base font-bold leading-snug text-ink">{item.dish_name}</p>
-            <p className={`text-xs font-bold ${riskInk}`}>{risky ? "High spike risk" : "Good choice"}</p>
+            <p className={`text-xs font-bold ${riskInk}`}>{riskLabel}</p>
           </div>
         </div>
 
@@ -341,7 +348,17 @@ export default function MenuSafePage() {
                   <AlertTriangle className="h-4 w-4 text-pastel-coral-strong" />
                   Watch out ({scanResult.risky_traps.length})
                 </h2>
-                {scanResult.risky_traps.map((item) => renderDish(item, true))}
+                {scanResult.risky_traps.map((item) => renderDish(item))}
+              </div>
+            )}
+
+            {scanResult.caution_items.length > 0 && (
+              <div className="space-y-3">
+                <h2 className="section-title flex items-center gap-2">
+                  <CircleAlert className="h-4 w-4 text-pastel-peach-strong" />
+                  Eat with care ({scanResult.caution_items.length})
+                </h2>
+                {scanResult.caution_items.map((item) => renderDish(item))}
               </div>
             )}
 
@@ -351,7 +368,7 @@ export default function MenuSafePage() {
                   <ShieldCheck className="h-4 w-4 text-pastel-lime-strong" />
                   Good choices ({scanResult.safe_selections.length})
                 </h2>
-                {scanResult.safe_selections.map((item) => renderDish(item, false))}
+                {scanResult.safe_selections.map((item) => renderDish(item))}
               </div>
             )}
           </section>
