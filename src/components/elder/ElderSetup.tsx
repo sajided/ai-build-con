@@ -59,7 +59,7 @@ export default function ElderSetup({ initial, onDone, onCancel }: ElderSetupProp
               </button>
             ) : (
               <Link href="/demo" lang="en" className="block h-12 pt-3 text-center text-base font-semibold text-ink-soft underline underline-offset-4">
-                First time here? Watch the 2-minute demo
+                First time here? Watch the 3½-minute demo
               </Link>
             )}
           </div>

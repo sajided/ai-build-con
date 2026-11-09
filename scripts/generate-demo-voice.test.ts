@@ -12,7 +12,7 @@ import { describe, it } from "vitest";
 import { createHash } from "crypto";
 import fs from "fs";
 import path from "path";
-import { DEMO_SPOKEN_LINES } from "@/app/demo/script";
+import { DEMO_SPOKEN_LINES } from "@/components/demo/script";
 
 const BASE = process.env.DEMO_VOICE_BASE_URL || "http://localhost:3000";
 const OUT = path.resolve(__dirname, "../public/demo-voice");

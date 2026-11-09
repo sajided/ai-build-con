@@ -1,11 +1,14 @@
 /**
  * Script and fake data for the judges' demo (/demo). Kept apart from the page so
- * scripts/generate-demo-voice.mjs can pre-record every spoken line.
+ * scripts/generate-demo-voice.test.ts can pre-record every spoken line.
  */
 
 import { readingFeedbackBn } from "@/lib/assistant/bangla";
 import { reminderSpeechBn, type DoseRecord, type Reminder } from "@/lib/care/reminders";
 import type { GlucoseLog, MeasurementContext } from "@/lib/validations/telemetry";
+import type { BazaarCartItem } from "@/lib/validations/deficits";
+import { BAZAAR_STAPLES_CATALOG } from "@/lib/nutrition/deficiency-engine";
+import { stapleUnitBn } from "@/components/deficits/BazaarStapleCard";
 
 // ---------- Demo persona and data ----------
 
@@ -54,6 +57,94 @@ export function demoHistory(now: Date) {
   return { logs, doses };
 }
 
+// ---------- Restaurant menu, nutrition, bazaar and recipe data ----------
+
+export interface DemoDish {
+  name: string;
+  risk: "red" | "yellow" | "green";
+  traps: string[];
+  why: string;
+  waiter: string;
+  swap?: string;
+}
+
+/** A Dhaka restaurant menu, judged the way MenuSafe does (Gemini reads it, rules make the final call). */
+export const MENU_DISHES: DemoDish[] = [
+  {
+    name: "কাচ্চি বিরিয়ানি",
+    risk: "red",
+    traps: ["পোলাও চাল (উচ্চ GI)", "ঘি ও তেল বেশি", "বোরহানিতে চিনি"],
+    why: "এক প্লেটে অনেক সাদা চাল আর ঘি, সুগার দ্রুত অনেক বাড়বে।",
+    waiter: "Please give me half a portion of rice with extra meat pieces and a cucumber salad first. No sweet borhani, please.",
+    swap: "অর্ধেক ভাত + সালাদ",
+  },
+  {
+    name: "মধু-চিকেন",
+    risk: "red",
+    traps: ["মধু / চিনি", "কর্নফ্লাওয়ার দেওয়া ঝোল", "ময়দার ভাজা প্রলেপ"],
+    why: "মিষ্টি প্রলেপ আর ভাজা ময়দা — লুকানো চিনি ও শর্করা।",
+    waiter:
+      "Please prepare the protein grilled or pan-seared instead of deep-fried, serve sauce/gravy on the side with no cornstarch thickener, omit the honey or sweet sugar glaze. Could I also have steamed vegetables or a side salad first?",
+    swap: "গ্রিল করা চিকেন + সবজি",
+  },
+  {
+    name: "সবজি খিচুড়ি",
+    risk: "yellow",
+    traps: ["চাল আছে"],
+    why: "ডাল আর সবজি ভালো, তবে চালের জন্য পরিমাণ কম রাখুন।",
+    waiter: "Please give me a small portion, with extra vegetables on the side.",
+  },
+  {
+    name: "তন্দুরি মাছ, পুদিনা দই ও ব্রকলি",
+    risk: "green",
+    traps: [],
+    why: "গ্রিল করা মাছ, টক দই আর ভাপানো সবজি — চিনি বা ময়দা নেই।",
+    waiter: "This dish is naturally diabetic-friendly! Please serve the vegetable salad first as an opening fiber shield.",
+  },
+];
+
+/** Her week as the nutrition engine sees it (same numbers as the app's "low-fibre week" sample). */
+export const NUTRITION_WEEK = { fiber: 14, magnesium: 210, protein: 45, carbs: 145 };
+
+const staple = (id: string) => BAZAAR_STAPLES_CATALOG.find((s) => s.id === id)!;
+
+export const BAZAAR_CART: BazaarCartItem[] = [
+  { id: "okra-dherosh", item: staple("okra-dherosh"), quantity: 2, addedAt: "" },
+  { id: "flaxseeds-tishi", item: staple("flaxseeds-tishi"), quantity: 1, addedAt: "" },
+  { id: "bitter-gourd-korola", item: staple("bitter-gourd-korola"), quantity: 1, addedAt: "" },
+];
+
+/**
+ * The bazaar list as it arrives on WhatsApp: the app's export (lib/cart/bazaar-cart.ts), trimmed for a
+ * phone bubble, with WhatsApp's *bold* markers already rendered and units as the list screen shows them.
+ */
+export function bazaarListText(cart: BazaarCartItem[]): string {
+  const total = cart.reduce((a, c) => a + c.item.pricePerUnit * c.quantity, 0);
+  const lines = cart.map(
+    (c) => `• ${c.item.localNameBengali ?? c.item.name} × ${c.quantity} ${stapleUnitBn(c.item)} (৳${Math.round(c.item.pricePerUnit * c.quantity * 120)})`
+  );
+  return `🛒 Jotno Local Bazaar Shopping List\n${lines.join("\n")}\n\nEstimated Total: ৳${Math.round(total * 120)}`;
+}
+
+export const RECIPE_INGREDIENTS = ["করলা", "মসুর ডাল", "কাঁচা মরিচ", "ঢেঁড়শ"];
+
+export const DEMO_RECIPE = {
+  title: "মসুর ডাল আর মশলাদার করলা-ঢেঁড়শ",
+  description: "অল্প তেলে হলুদ-মরিচে ভাজা করলা ও ঢেঁড়শ, সাথে ঘন মসুর ডাল।",
+  minutes: 30,
+  calories: 195,
+  macros: [
+    { label: "আসল শর্করা", grams: 10.4, tone: "bg-pastel-peach text-pastel-peach-ink" },
+    { label: "আঁশ", grams: 10.8, tone: "bg-pastel-lime text-pastel-lime-ink" },
+    { label: "প্রোটিন", grams: 14.5, tone: "bg-pastel-blue text-pastel-blue-ink" },
+  ],
+  sequence: [
+    { title: "প্রথমে: আঁশ (শাকসবজি)", items: "করলা-ঢেঁড়শ ভাজি", note: "১০ মিনিট ধরে আস্তে খান", tone: "bg-pastel-lime text-pastel-lime-ink" },
+    { title: "তারপর: প্রোটিন ও চর্বি", items: "মসুর ডাল", note: "সবজির পরে ডাল খান", tone: "bg-pastel-blue text-pastel-blue-ink" },
+    { title: "শেষে: ভাত-রুটি (শর্করা)", items: "আধা কাপ ভাত", note: "সবশেষে, অল্প পরিমাণে", tone: "bg-pastel-peach text-pastel-peach-ink" },
+  ],
+};
+
 // ---------- Script ----------
 
 export type ScreenId =
@@ -70,6 +161,18 @@ export type ScreenId =
   | "food-camera"
   | "food-reading"
   | "food-verdict"
+  | "menu-camera"
+  | "menu-reading"
+  | "menu-results"
+  | "menu-waiter"
+  | "nutrition-meters"
+  | "nutrition-staples"
+  | "bazaar-cart"
+  | "bazaar-share"
+  | "recipe-ingredients"
+  | "recipe-thinking"
+  | "recipe-result"
+  | "recipe-sequence"
   | "reminder"
   | "reminder-done"
   | "report"
@@ -210,7 +313,75 @@ export const SCENES: Scene[] = [
     ],
   },
   {
-    kicker: "Feature 4 · Medicine",
+    kicker: "Feature 4 · Restaurant menu",
+    title: "Eating out: photograph the menu, know what to order",
+    how: [
+      "Gemini reads a photo of any menu (or a typed dish name).",
+      "Then Jotno's own rules make the final call. Bangladeshi traps such as biryani, kacchi, porota and mishti can only raise the risk, never lower it.",
+      "Each dish is marked এড়িয়ে চলুন (avoid) · অল্প খান (eat less) · ভালো (good), with the hidden sugar and starch named.",
+      "A ready-written English request for the waiter, plus a healthier swap.",
+    ],
+    beats: [
+      { screen: "menu-camera", caption: "On Friday her family takes her to a restaurant. She photographs the menu.", ms: 4500 },
+      { screen: "menu-reading", caption: "Gemini reads every dish. Then Jotno's safety rules double-check each one.", ms: 3000 },
+      {
+        screen: "menu-results",
+        caption: "Kacchi biryani and honey chicken: avoid. Khichuri: eat less. Tandoori fish: good. The hidden sugar and starch are named for each.",
+        ms: 7000,
+      },
+      {
+        screen: "menu-waiter",
+        caption: "She can't explain her diet in English, so Jotno writes it for her. She just shows the phone to the waiter.",
+        ms: 6500,
+      },
+    ],
+  },
+  {
+    kicker: "Feature 5 · Nutrition & bazaar",
+    title: "What's missing from her food, and a shopping list to fix it",
+    how: [
+      "Weekly fibre, magnesium and protein-to-carb balance against fixed targets (30 g fibre, 400 mg magnesium).",
+      "Rule-based, with no AI, so the advice is the same every time.",
+      "Suggests cheap local foods that fill the gap: okra, flax seeds, isabgol, karela. Each shows its GI, market price in ৳ and how to cook it.",
+      "One tap adds a food to the bazaar list, which totals the cost and is sent to whoever does the shopping.",
+    ],
+    beats: [
+      {
+        screen: "nutrition-meters",
+        caption: "This week she ate only 14 g of fibre a day, half the 30 g target. Low fibre makes sugar spike after meals.",
+        ms: 6000,
+      },
+      {
+        screen: "nutrition-staples",
+        caption: "Jotno suggests cheap local foods that fill the gap, such as okra (৳48) and flax seeds (৳102), with their GI and how to cook them.",
+        ms: 6500,
+      },
+      { screen: "bazaar-cart", caption: "She adds them to her bazaar list, which shows the total cost in Taka.", ms: 5500 },
+      { screen: "bazaar-share", caption: "The list goes to her son on WhatsApp, and he shops on his way home.", ms: 5000 },
+    ],
+  },
+  {
+    kicker: "Feature 6 · Recipes",
+    title: "Cook with what's in the kitchen",
+    how: [
+      "Ingredients are typed or come straight from a grocery scan.",
+      "Gemini writes low-GI recipes using only those ingredients.",
+      "A rule-based checker removes any sugar or starch she didn't have and recalculates net carbs.",
+      "It also gives the order to eat in: vegetables first, then protein, rice last. This blunts the sugar spike.",
+    ],
+    beats: [
+      { screen: "recipe-ingredients", caption: "Back home she has okra from the bazaar, plus karela, masoor dal and green chilli. She asks for a recipe.", ms: 5000 },
+      { screen: "recipe-thinking", caption: "Gemini writes a recipe using only these ingredients.", ms: 3000 },
+      { screen: "recipe-result", caption: "Low GI, 30 minutes, about 195 calories, with carbs, fibre and protein spelled out.", ms: 5500 },
+      {
+        screen: "recipe-sequence",
+        caption: "It also says what order to eat in: vegetables first, then dal, rice last. The same food raises her sugar less.",
+        ms: 6500,
+      },
+    ],
+  },
+  {
+    kicker: "Feature 7 · Medicine",
     title: "Spoken medicine reminders",
     how: [
       "Family sets up medicines once with morning / noon / night presets — no clock pickers.",
@@ -229,7 +400,7 @@ export const SCENES: Scene[] = [
     ],
   },
   {
-    kicker: "Feature 5 · Doctor & family",
+    kicker: "Feature 8 · Doctor & family",
     title: "A report the doctor can read in 30 seconds",
     how: [
       "Averages, fasting average, lows, highs, time-in-range (3.9–10.0 mmol/L) and medicine adherence.",
@@ -250,6 +421,7 @@ export const SCENES: Scene[] = [
     title: "Diabetes care that speaks her language",
     how: [
       "Voice + photo input in Bangla — no typing, no English.",
+      "Food help everywhere she eats: her plate, restaurant menus, recipes from her own kitchen, and a bazaar list priced in Taka.",
       "Safety first: confirm before saving, help screen on dangerous readings, never gives doses.",
       "Family and doctor stay informed with one tap.",
       "Next.js PWA · Gemini (speech, vision, Bangla TTS) · Supabase · works offline.",

@@ -1,7 +1,8 @@
+import type React from "react";
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 
-vi.mock("next/link", () => ({ default: ({ href, children, ...rest }: any) => <a href={href} {...rest}>{children}</a> }));
+vi.mock("next/link", () => ({ default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => <a href={href} {...rest}>{children}</a> }));
 vi.mock("@/lib/assistant/client", () => ({
   speak: vi.fn(async () => true),
   stopSpeaking: vi.fn(),
@@ -27,5 +28,24 @@ describe("judges' demo simulation", () => {
     fireEvent.click(screen.getByText(/Doctor & family/));
     expect(screen.getByText("A report the doctor can read in 30 seconds")).toBeTruthy();
     expect(screen.getAllByText(/Glucose report/).length).toBeGreaterThan(0);
+  });
+});
+
+vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
+import AppShell from "@/components/app/AppShell";
+
+describe("simulation button beside the real app", () => {
+  it("swaps the real app for the simulation and back", () => {
+    render(
+      <AppShell>
+        <p>real app home</p>
+      </AppShell>
+    );
+    expect(screen.getByText("real app home")).toBeTruthy();
+    fireEvent.click(screen.getByText("Watch the simulation"));
+    expect(screen.queryByText("real app home")).toBeNull();
+    expect(screen.getByText("Built for a 68-year-old who has never used an app")).toBeTruthy();
+    fireEvent.click(screen.getByText("Back to the real app"));
+    expect(screen.getByText("real app home")).toBeTruthy();
   });
 });
