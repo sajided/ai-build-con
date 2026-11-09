@@ -78,6 +78,18 @@ export default function GeminiLiveScanner() {
   const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+  // Blocks overlapping scans (one tap must never send two requests)
+  const inFlightRef = useRef(false);
+  // Main capsule: short tap = photo scan, press-and-hold = voice question
+  const pressRef = useRef<{ down: boolean; holdTimer: ReturnType<typeof setTimeout> | null; voice: boolean }>({
+    down: false,
+    holdTimer: null,
+    voice: false,
+  });
+  // Set when the press ends (submit) or is aborted (cancel) before the mic finished opening
+  const voiceStopRequestedRef = useRef(false);
+  const voiceCancelRequestedRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Start or restart camera stream
@@ -125,6 +137,13 @@ export default function GeminiLiveScanner() {
     };
   }, [facingMode, startCamera, stopCamera]);
 
+  // Release the microphone if the screen is left mid-recording
+  useEffect(() => {
+    return () => {
+      audioStreamRef.current?.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
+
   const toggleFlipCamera = () => {
     const nextFacing = facingMode === "environment" ? "user" : "environment";
     setFacingMode(nextFacing);
@@ -147,13 +166,34 @@ export default function GeminiLiveScanner() {
     setIsSpeaking(false);
   };
 
+  const releaseMic = () => {
+    audioStreamRef.current?.getTracks().forEach((t) => t.stop());
+    audioStreamRef.current = null;
+    mediaRecorderRef.current = null;
+  };
+
   // Push-to-Talk voice capture handlers
   const handleVoiceStart = async () => {
     stopSpeaking();
-    if (isMuted) return;
+    voiceStopRequestedRef.current = false;
+    voiceCancelRequestedRef.current = false;
     try {
       if (typeof navigator === "undefined" || !navigator.mediaDevices) return;
       const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioStreamRef.current = audioStream;
+
+      if (voiceCancelRequestedRef.current) {
+        releaseMic();
+        return;
+      }
+
+      // Press already ended while the mic permission/open was pending: scan without audio.
+      if (voiceStopRequestedRef.current) {
+        releaseMic();
+        submitScan(null);
+        return;
+      }
+
       audioChunksRef.current = [];
       const recorder = new MediaRecorder(audioStream);
       mediaRecorderRef.current = recorder;
@@ -166,17 +206,30 @@ export default function GeminiLiveScanner() {
       setIsRecording(true);
     } catch {
       setIsRecording(false);
+      releaseMic();
+      // Mic unavailable/denied: still scan the photo the user is pointing at.
+      if (voiceStopRequestedRef.current) submitScan(null);
+      else if (!voiceCancelRequestedRef.current) voiceStopRequestedRef.current = true;
     }
   };
 
   const handleVoiceStopAndSubmit = async () => {
-    if (!mediaRecorderRef.current) {
-      submitScan(null);
+    const recorder = mediaRecorderRef.current;
+    if (!recorder) {
+      if (voiceStopRequestedRef.current) {
+        // Mic already failed during the hold: scan the photo without audio.
+        voiceStopRequestedRef.current = false;
+        submitScan(null);
+        return;
+      }
+      // Mic not open yet; handleVoiceStart will submit once it resolves.
+      voiceStopRequestedRef.current = true;
       return;
     }
 
-    mediaRecorderRef.current.onstop = async () => {
+    recorder.onstop = async () => {
       setIsRecording(false);
+      releaseMic();
       const audioBlob =
         audioChunksRef.current.length > 0
           ? new Blob(audioChunksRef.current, { type: "audio/webm" })
@@ -184,9 +237,70 @@ export default function GeminiLiveScanner() {
       await submitScan(audioBlob);
     };
 
-    if (mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
+    if (recorder.state !== "inactive") {
+      recorder.stop();
     }
+  };
+
+  // Single input path for the main capsule (pointer events cover touch, pen and mouse,
+  // so one tap can no longer fire touch + mouse + click handlers and submit 2-3 scans).
+  const HOLD_TO_TALK_MS = 400;
+
+  const handleCapsulePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    if (isProcessing || inFlightRef.current || pressRef.current.down) return;
+    pressRef.current.down = true;
+    pressRef.current.voice = false;
+    // With the mic muted, a long press is just a photo scan.
+    if (isMuted) return;
+    pressRef.current.holdTimer = setTimeout(() => {
+      pressRef.current.voice = true;
+      handleVoiceStart();
+    }, HOLD_TO_TALK_MS);
+  };
+
+  const handleCapsulePointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    const press = pressRef.current;
+    if (!press.down) return;
+    press.down = false;
+    if (press.holdTimer) clearTimeout(press.holdTimer);
+    press.holdTimer = null;
+    if (press.voice) {
+      handleVoiceStopAndSubmit();
+    } else {
+      submitScan(null);
+    }
+  };
+
+  const handleCapsulePointerCancel = () => {
+    const press = pressRef.current;
+    if (!press.down) return;
+    press.down = false;
+    if (press.holdTimer) clearTimeout(press.holdTimer);
+    press.holdTimer = null;
+    if (press.voice) {
+      // Gesture aborted (e.g. finger slid off): discard the recording, don't scan.
+      voiceStopRequestedRef.current = false;
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== "inactive") {
+        recorder.onstop = () => {
+          setIsRecording(false);
+          releaseMic();
+        };
+        recorder.stop();
+      } else {
+        // Mic still opening (or failed): make handleVoiceStart release it without scanning.
+        voiceCancelRequestedRef.current = true;
+        releaseMic();
+      }
+    }
+  };
+
+  const showScanError = (message: string) => {
+    setErrorMessage(message);
+    // Elders may not read the banner, so errors are spoken like results are.
+    speak(message).catch(() => {});
   };
 
   const compressImageForFastScan = async (
@@ -267,6 +381,8 @@ export default function GeminiLiveScanner() {
     presetOverride?: { payload: string; query: string },
     fileOverride?: File | Blob
   ) => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     setErrorMessage(null);
     setIsFlashing(true);
     setTimeout(() => setIsFlashing(false), 200);
@@ -291,8 +407,11 @@ export default function GeminiLiveScanner() {
         if (frame) {
           formData.append("image", frame, "frame.jpg");
         } else if (capturedImage) {
-          formData.append("image", capturedImage);
-        } else {
+          // capturedImage is a data URL; send it as a real file, not a string field
+          const blob = await (await fetch(capturedImage)).blob();
+          formData.append("image", blob, "upload.jpg");
+        } else if (!audioBlob && !queryToSend) {
+          // No camera frame (demo laptop / permission denied): show the sample basket
           formData.append("preset", "mock-preset");
         }
       }
@@ -307,18 +426,17 @@ export default function GeminiLiveScanner() {
       });
 
       if (!res.ok) {
-        let errMessage = "স্ক্যান সম্পন্ন করা সম্ভব হয়নি।";
+        let errMessage = "স্ক্যান করা যায়নি। একটু পরে আবার চেষ্টা করুন।";
         try {
           const errData = await res.json();
           errMessage = errData.error || errMessage;
         } catch {
-          errMessage =
-            res.status === 504
-              ? "সার্ভার টাইমআউট (Vercel timeout)। আবার চেষ্টা করুন।"
-              : `সার্ভার ত্রুটি (${res.status})`;
+          if (res.status === 504) errMessage = "অনেক সময় লাগছে। আবার চেষ্টা করুন।";
         }
-        setErrorMessage(errMessage);
-        setIsProcessing(false);
+        // Clear any previous result so an old answer is never mistaken for this scan.
+        setResult(null);
+        setIsLiveResult(null);
+        showScanError(errMessage);
         return;
       }
 
@@ -326,17 +444,22 @@ export default function GeminiLiveScanner() {
       if (json.success && json.data) {
         setResult(json.data);
         setIsLiveResult(json.isLive ?? null);
-        setIsProcessing(false);
         if (json.data.voice_assistant_response) {
           speakResponse(json.data.voice_assistant_response);
         }
+        if (json.droppedAudio) {
+          setErrorMessage("আপনার কথা শোনা যায়নি, শুধু ছবি দেখে উত্তর দেওয়া হয়েছে।");
+        }
       } else {
-        setErrorMessage(json.error || "স্ক্যান ফলাফল পাওয়া যায়নি।");
+        setResult(null);
+        showScanError(json.error || "স্ক্যান করা যায়নি। আবার চেষ্টা করুন।");
       }
     } catch (err: unknown) {
       console.error("Jotno Live scan error:", err);
-      setErrorMessage("নেটওয়ার্ক ত্রুটি। ইন্টারনেট সংযোগ পরীক্ষা করুন।");
+      setResult(null);
+      showScanError("ইন্টারনেট সংযোগ নেই। সংযোগ দেখে আবার চেষ্টা করুন।");
     } finally {
+      inFlightRef.current = false;
       setIsProcessing(false);
     }
   };
@@ -824,15 +947,16 @@ export default function GeminiLiveScanner() {
           {/* Button 3: THE GEMINI LIVE AUDIO CAPSULE (CENTER GLOWING PILL) */}
           <button
             type="button"
-            onMouseDown={handleVoiceStart}
-            onMouseUp={handleVoiceStopAndSubmit}
-            onTouchStart={handleVoiceStart}
-            onTouchEnd={handleVoiceStopAndSubmit}
-            onClick={() => {
-              if (!isRecording && !isProcessing) {
-                submitScan(null);
-              }
+            onPointerDown={handleCapsulePointerDown}
+            onPointerUp={handleCapsulePointerUp}
+            onPointerCancel={handleCapsulePointerCancel}
+            onPointerLeave={handleCapsulePointerCancel}
+            onContextMenu={(e) => e.preventDefault()}
+            onClick={(e) => {
+              // Keyboard activation (Enter/Space) reports detail 0; pointer taps are handled above.
+              if (e.detail === 0) submitScan(null);
             }}
+            style={{ touchAction: "none" }}
             aria-label="Jotno Live Voice Push to Talk or Instant Scan"
             className={`relative w-32 h-13 sm:w-36 sm:h-14 rounded-full bg-black border border-white/25 shadow-2xl overflow-hidden flex items-center justify-center transition-all select-none active:scale-95 ${
               isRecording

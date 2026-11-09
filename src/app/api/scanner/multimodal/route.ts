@@ -4,9 +4,20 @@ import { queryNutritionSources, type NormalizedNutrition } from "@/lib/rag/nutri
 import { estimateRecipeCost, type RecipeCostEstimate } from "@/lib/pricing/cost-estimator";
 import { env, getSystemEnvStatus } from "@/lib/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { parseAndGuardMultimodalOutput, withTimeout, type GuardedOutput } from "@/lib/ai/multimodal-guard";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
+
+// Time budget (ms from request start). Vercel kills the function at maxDuration.
+const AI_BUDGET_MS = 21000; // all Gemini attempts combined
+const MIN_ATTEMPT_MS = 3000; // don't start a model attempt with less than this left
+const ENRICH_DEADLINE_MS = 26000; // nutrition lookup + cost estimate must finish by here
+const LOG_DEADLINE_MS = 28500; // best-effort Supabase logging
+
+// Hackathon demo mode: when Gemini fails or isn't configured, answer with the matching sample
+// result so the demo never dead-ends. Set SCAN_DEMO_FALLBACK=false for real patients.
+const ALLOW_DEMO_FALLBACK = process.env.SCAN_DEMO_FALLBACK !== "false";
 
 export type ScanMode = "auto" | "grocery_bazaar" | "restaurant_menu" | "prepared_food";
 
@@ -19,6 +30,7 @@ export interface MultimodalOutput {
     category?: string;
     gi_index: number;
     gl_load: number;
+    net_carbs_g?: number;
     risk_level?: "green" | "yellow" | "red";
     verified_rag_data?: NormalizedNutrition | null;
   }>;
@@ -301,7 +313,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (json.imageBase64) {
-        if (json.imageBase64.startsWith("mock-") || json.imageBase64.includes("preset")) {
+        if (json.imageBase64.startsWith("mock-")) {
           presetIdentifier = json.imageBase64;
         }
         const matches = json.imageBase64.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/);
@@ -327,13 +339,14 @@ export async function POST(req: NextRequest) {
     let parsedAI: MultimodalOutput | null = null;
     let isLiveAi = false;
     let modelUsed: string | null = null;
+    let droppedAudio = false;
+
+    // Sample data is ONLY ever returned when the user explicitly picked a sample preset.
+    const userChoseSample = Boolean(presetIdentifier?.startsWith("mock-"));
+    const aiDeadline = startTime + AI_BUDGET_MS;
 
     // Call Gemini Flash models if live API key is available
-    if (
-      envStatus.gemini.isLive &&
-      (imageBase64 || audioBase64) &&
-      !presetIdentifier?.startsWith("mock-")
-    ) {
+    if (envStatus.gemini.isLive && !userChoseSample && (imageBase64 || audioBase64 || textQuery)) {
       const CANDIDATE_MODELS = ["gemini-2.5-flash", "gemini-3.5-flash-lite"];
       const ai = new GoogleGenAI({ apiKey: env.geminiApiKey });
 
@@ -396,7 +409,7 @@ Return ONLY a raw JSON object matching this schema with NO markdown code fences:
   "detected_type": "grocery_bazaar" | "restaurant_menu" | "prepared_food",
   "detected_title": "string",
   "identified_items": [
-    { "name": "string", "quantity": "string", "category": "string", "gi_index": number, "gl_load": number, "risk_level": "green"|"yellow"|"red" }
+    { "name": "string", "quantity": "string", "category": "string", "gi_index": number, "net_carbs_g": number (net carbs per typical serving), "gl_load": number, "risk_level": "green"|"yellow"|"red" }
   ],
   "nutritional_summary": {
     "calories": number,
@@ -417,66 +430,64 @@ Return ONLY a raw JSON object matching this schema with NO markdown code fences:
   "voice_assistant_response": "string (in fluent Bangla)"
 }`;
 
-      for (const model of CANDIDATE_MODELS) {
+      // One model call with a hard timeout that also aborts the underlying request.
+      const callModel = async (model: string, includeAudio: boolean, timeoutMs: number) => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
         try {
-          // Attempt 1: With audio if provided
-          let parts = buildContentParts(Boolean(audioBase64));
-          let generatePromise = ai.models.generateContent({
-            model,
-            contents: [{ role: "user", parts }],
-            config: {
-              responseMimeType: "application/json",
-              maxOutputTokens: 1000,
-              temperature: 0.2,
-            },
-          });
+          const response = await Promise.race([
+            ai.models.generateContent({
+              model,
+              contents: [{ role: "user", parts: buildContentParts(includeAudio) }],
+              config: {
+                responseMimeType: "application/json",
+                // Bangla text + full schema needs headroom; truncated JSON used to fall back to sample data.
+                maxOutputTokens: 4096,
+                temperature: 0.2,
+                abortSignal: controller.signal,
+              },
+            }),
+            new Promise<never>((_, reject) =>
+              controller.signal.addEventListener("abort", () =>
+                reject(new Error(`Gemini multimodal inference timed out for ${model}`))
+              )
+            ),
+          ]);
+          return parseAndGuardMultimodalOutput(response.text || "");
+        } finally {
+          clearTimeout(timer);
+        }
+      };
 
-          let timeoutPromise = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error(`Gemini multimodal inference timed out for ${model}`)), 12000)
-          );
+      // Every attempt shares one budget so the whole request stays under maxDuration.
+      const remaining = () => aiDeadline - Date.now();
 
-          let response;
+      for (const model of CANDIDATE_MODELS) {
+        if (remaining() < MIN_ATTEMPT_MS) break;
+        try {
+          let guarded: GuardedOutput;
           try {
-            response = await Promise.race([generatePromise, timeoutPromise]);
+            guarded = await callModel(model, Boolean(audioBase64), Math.min(12000, remaining()));
           } catch (audioOrModelErr) {
-            // If failed and audio was included, retry without audio in case audio codec failed
-            if (audioBase64) {
-              console.warn(`[Gemini Multimodal] Retrying ${model} without audio part:`, audioOrModelErr);
-              parts = buildContentParts(false);
-              generatePromise = ai.models.generateContent({
-                model,
-                contents: [{ role: "user", parts }],
-                config: {
-                  responseMimeType: "application/json",
-                  maxOutputTokens: 1000,
-                  temperature: 0.2,
-                },
-              });
-              timeoutPromise = new Promise<never>((_, reject) =>
-                setTimeout(() => reject(new Error(`Gemini multimodal inference timed out for ${model} without audio`)), 10000)
-              );
-              response = await Promise.race([generatePromise, timeoutPromise]);
-            } else {
-              throw audioOrModelErr;
-            }
+            // If audio was included, retry once without it in case the audio codec failed
+            if (!audioBase64 || remaining() < MIN_ATTEMPT_MS) throw audioOrModelErr;
+            console.warn(`[Gemini Multimodal] Retrying ${model} without audio part:`, audioOrModelErr);
+            guarded = await callModel(model, false, Math.min(10000, remaining()));
+            droppedAudio = true;
           }
 
-          const rawText = response.text || "{}";
-          const sanitized = rawText.replace(/^```json\s*/i, "").replace(/\s*```$/, "").trim();
-          const parsedObj = JSON.parse(sanitized);
-
-          if (!parsedObj.detected_type) {
-            parsedObj.detected_type = detectCategoryFromInput(textQuery, presetIdentifier);
-          }
-          if (!parsedObj.detected_title) {
-            parsedObj.detected_title =
-              parsedObj.detected_type === "restaurant_menu"
+          const detected_type = guarded.detected_type ?? detectCategoryFromInput(textQuery, presetIdentifier);
+          parsedAI = {
+            ...guarded,
+            detected_type,
+            detected_title:
+              guarded.detected_title ||
+              (detected_type === "restaurant_menu"
                 ? "Restaurant Dining Menu"
-                : parsedObj.detected_type === "prepared_food"
+                : detected_type === "prepared_food"
                 ? "Cooked Meal Plate"
-                : "Raw Grocery & Bazaar Basket";
-          }
-          parsedAI = parsedObj as MultimodalOutput;
+                : "Raw Grocery & Bazaar Basket"),
+          };
           isLiveAi = true;
           modelUsed = model;
           break; // Succeeded!
@@ -487,78 +498,105 @@ Return ONLY a raw JSON object matching this schema with NO markdown code fences:
     }
 
     if (!parsedAI) {
-      // Use structured clinical fallback
+      if (!userChoseSample && !ALLOW_DEMO_FALLBACK) {
+        // Production: never substitute sample data for a real photo/voice/text scan.
+        const notConfigured = !envStatus.gemini.isLive;
+        return NextResponse.json(
+          {
+            success: false,
+            code: notConfigured ? "AI_NOT_CONFIGURED" : "AI_UNAVAILABLE",
+            error: notConfigured
+              ? "স্ক্যান সেবা এখন চালু নেই। পরে আবার চেষ্টা করুন।"
+              : "ছবিটি বোঝা যায়নি। খাবারটি আলোতে রেখে, কাছ থেকে আবার ছবি তুলুন।",
+            latencyMs: Date.now() - startTime,
+          },
+          { status: 503 }
+        );
+      }
       parsedAI = getFallbackResponse(scanMode, textQuery, presetIdentifier);
     }
 
-    // 3. Parallel Multimodal RAG Enrichment for Top Items
-    if (parsedAI.identified_items && parsedAI.identified_items.length > 0) {
-      const topItems = parsedAI.identified_items.slice(0, 4);
-      const enrichedItems = await Promise.all(
-        topItems.map(async (item) => {
-          const matched = await queryNutritionSources(item.name);
-          return {
-            ...item,
-            verified_rag_data: matched.length > 0 ? matched[0] : null,
-          };
-        })
+    const result: MultimodalOutput = parsedAI;
+
+    // 3. Parallel Multimodal RAG Enrichment for Top Items (bounded by the request budget)
+    if (result.identified_items && result.identified_items.length > 0) {
+      const topItems = result.identified_items.slice(0, 4);
+      const enrichedItems = await withTimeout(
+        Promise.all(
+          topItems.map(async (item) => {
+            const matched = await queryNutritionSources(item.name);
+            return {
+              ...item,
+              verified_rag_data: matched.length > 0 ? matched[0] : null,
+            };
+          })
+        ),
+        ENRICH_DEADLINE_MS - (Date.now() - startTime),
+        topItems
       );
-      parsedAI.identified_items = [
-        ...enrichedItems,
-        ...parsedAI.identified_items.slice(4),
-      ];
+      result.identified_items = [...enrichedItems, ...result.identified_items.slice(4)];
     }
 
     // 4. Calculate Kaggle Global Food Price Cost Estimates
-    const ingredientsForCost = (parsedAI.identified_items || []).map((it) => ({
+    const ingredientsForCost = (result.identified_items || []).map((it) => ({
       name: it.name,
       amount_g: 200, // standard benchmark reference portion
     }));
-    const costEstimate = await estimateRecipeCost(ingredientsForCost);
-    parsedAI.cost_estimate = costEstimate;
+    const costEstimate = await withTimeout<RecipeCostEstimate | undefined>(
+      estimateRecipeCost(ingredientsForCost),
+      ENRICH_DEADLINE_MS - (Date.now() - startTime),
+      undefined
+    );
+    result.cost_estimate = costEstimate;
+    parsedAI = result;
 
-    // 5. Optionally record to Supabase Food Scans & Voice Logs if user is logged in
-    try {
-      const supabase = createServerSupabaseClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+    // 5. Optionally record to Supabase Food Scans & Voice Logs if user is logged in (best effort, bounded)
+    const finalResult = result;
+    await withTimeout(
+      (async () => {
+        const supabase = createServerSupabaseClient();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
 
-      if (session?.user) {
-        const userId = session.user.id;
-        const { data: scanInsert } = await supabase
-          .from("food_scans")
-          .insert({
-            user_id: userId,
-            scan_type: parsedAI.detected_type,
-            scan_mode: parsedAI.detected_type,
-            voice_prompt_transcript: textQuery || null,
-            raw_ai_response: parsedAI,
-            detected_items: parsedAI.identified_items,
-            cost_estimate: costEstimate,
-            health_risk_alerts: parsedAI.health_risk_alerts,
-          })
-          .select("id")
-          .maybeSingle();
+        if (session?.user) {
+          const userId = session.user.id;
+          const { data: scanInsert } = await supabase
+            .from("food_scans")
+            .insert({
+              user_id: userId,
+              scan_type: finalResult.detected_type,
+              scan_mode: finalResult.detected_type,
+              voice_prompt_transcript: textQuery || null,
+              raw_ai_response: finalResult,
+              detected_items: finalResult.identified_items,
+              cost_estimate: costEstimate,
+              health_risk_alerts: finalResult.health_risk_alerts,
+            })
+            .select("id")
+            .maybeSingle();
 
-        if (audioBase64 && scanInsert?.id) {
-          await supabase.from("voice_interaction_logs").insert({
-            user_id: userId,
-            scan_id: scanInsert.id,
-            user_query: textQuery || "Voice audio query",
-            ai_response_text: parsedAI.voice_assistant_response,
-            ai_audio_latency_ms: Date.now() - startTime,
-          });
+          if (audioBase64 && scanInsert?.id) {
+            await supabase.from("voice_interaction_logs").insert({
+              user_id: userId,
+              scan_id: scanInsert.id,
+              user_query: textQuery || "Voice audio query",
+              ai_response_text: finalResult.voice_assistant_response,
+              ai_audio_latency_ms: Date.now() - startTime,
+            });
+          }
         }
-      }
-    } catch {
-      // Supabase logging is non-blocking
-    }
+      })(),
+      LOG_DEADLINE_MS - (Date.now() - startTime),
+      undefined
+    );
 
     return NextResponse.json({
       success: true,
       data: parsedAI,
       isLive: isLiveAi,
+      isSample: !isLiveAi,
+      droppedAudio,
       model: modelUsed,
       apiConfigured: envStatus.gemini.isLive,
       latencyMs: Date.now() - startTime,
@@ -569,7 +607,7 @@ Return ONLY a raw JSON object matching this schema with NO markdown code fences:
     const message = error instanceof Error ? error.message : "Failed to process multimodal input";
     console.error("Multimodal processing handler error:", error);
     return NextResponse.json(
-      { success: false, error: message },
+      { success: false, code: "INTERNAL", error: "স্ক্যান করা যায়নি। একটু পরে আবার চেষ্টা করুন।", details: message },
       { status: 500 }
     );
   }
