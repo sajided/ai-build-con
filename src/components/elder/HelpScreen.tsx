@@ -1,6 +1,7 @@
 "use client";
 
-import { AlertTriangle, Phone, Volume2 } from "lucide-react";
+import { AlertTriangle, MessageSquareText, Phone, Volume2 } from "lucide-react";
+import { smsHref, whatsappHref } from "@/lib/care/report";
 
 export type HelpKind = "low" | "very_high" | "symptoms";
 
@@ -9,6 +10,8 @@ interface HelpScreenProps {
   message: string;
   contactName?: string;
   contactPhone?: string;
+  /** Prefilled message for the family contact (SMS / WhatsApp) */
+  alertText?: string;
   onReplay: () => void;
   onClose: () => void;
 }
@@ -22,7 +25,7 @@ const TITLES: Record<HelpKind, string> = {
 /** Bangladesh national emergency number */
 const EMERGENCY_NUMBER = "999";
 
-export default function HelpScreen({ kind, message, contactName, contactPhone, onReplay, onClose }: HelpScreenProps) {
+export default function HelpScreen({ kind, message, contactName, contactPhone, alertText, onReplay, onClose }: HelpScreenProps) {
   const urgent = kind !== "very_high";
 
   return (
@@ -52,7 +55,20 @@ export default function HelpScreen({ kind, message, contactName, contactPhone, o
               <Phone className="h-7 w-7" />
               {contactName ? `${contactName}-কে ফোন করুন` : "পরিবারকে ফোন করুন"}
             </a>
-          ) : (
+          ) : null}
+          {contactPhone && alertText && (
+            <div className="grid grid-cols-2 gap-3">
+              <a href={smsHref(contactPhone, alertText)} className="btn-secondary h-16 text-lg">
+                <MessageSquareText className="h-6 w-6" />
+                SMS পাঠান
+              </a>
+              <a href={whatsappHref(contactPhone, alertText)} target="_blank" rel="noopener noreferrer" className="btn-secondary h-16 text-lg">
+                <MessageSquareText className="h-6 w-6" />
+                WhatsApp
+              </a>
+            </div>
+          )}
+          {!contactPhone && (
             <p className="rounded-2xl bg-white/70 p-4 text-lg font-semibold">
               পরিবারের কারো নম্বর যোগ করলে এখানে এক চাপে ফোন করতে পারবেন।
             </p>
