@@ -46,6 +46,8 @@ import {
 import { alertMessageBn } from "@/lib/care/report";
 
 const MAX_RECORDING_MS = 15000;
+const MIN_HOLD_MS = 500;
+const HOLD_HINT = "বড় বোতামটি চেপে ধরে রেখে কথা বলুন, বলা শেষ হলে ছেড়ে দিন।";
 
 const ACTION_TILE =
   "tile flex min-h-[128px] flex-col items-center justify-center gap-3 text-center active:opacity-80";
@@ -214,22 +216,68 @@ export default function ElderHomePage() {
     const blob = await recording.stop();
     setPhase("idle");
     if (blob.size < 1500) {
-      say("কিছু শুনতে পাইনি। বড় বোতাম চেপে আবার বলুন।");
+      say("কিছু শুনতে পাইনি। বড় বোতাম চেপে ধরে রেখে আবার বলুন।");
       return;
     }
     ask("talk", { audio: blob });
   }, [ask, say]);
 
-  const toggleMic = async () => {
-    if (phase === "recording") return finishRecording();
-    if (phase === "thinking") return;
+  // ---------- Push to talk: hold the big button, speak, release to send ----------
+  const pressRef = useRef<{ down: boolean; startedAt: number }>({ down: false, startedAt: 0 });
+
+  const beginRecording = async () => {
     stopSpeaking();
     setReply(null);
     try {
-      recordingRef.current = await startRecording(MAX_RECORDING_MS, finishRecording);
+      const recording = await startRecording(MAX_RECORDING_MS, finishRecording);
+      // Released while the mic was still opening: drop it and explain how to use the button
+      if (!pressRef.current.down) {
+        recording.cancel();
+        say(HOLD_HINT);
+        return;
+      }
+      recordingRef.current = recording;
       setPhase("recording");
     } catch {
+      pressRef.current.down = false;
       say("মাইক্রোফোন চালু করা যায়নি। ফোনের সেটিংসে মাইক্রোফোনের অনুমতি দিন।");
+    }
+  };
+
+  const onTalkDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    if (phase !== "idle" || pressRef.current.down) return;
+    // Keep receiving pointer events even if the finger drifts off the button
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    pressRef.current = { down: true, startedAt: Date.now() };
+    beginRecording();
+  };
+
+  const onTalkUp = (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    if (!pressRef.current.down) return;
+    pressRef.current.down = false;
+    if (!recordingRef.current) return; // mic still opening; beginRecording handles it
+    if (Date.now() - pressRef.current.startedAt < MIN_HOLD_MS) {
+      // A quick tap, not a hold
+      recordingRef.current.cancel();
+      recordingRef.current = null;
+      setPhase("idle");
+      say(HOLD_HINT);
+      return;
+    }
+    finishRecording();
+  };
+
+  // Keyboard (Enter/Space) can't "hold", so it toggles: press once to start, again to send
+  const onTalkKeyboard = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (e.detail !== 0) return; // pointer clicks are handled by the pointer events
+    if (phase === "recording") {
+      pressRef.current.down = false;
+      finishRecording();
+    } else if (phase === "idle") {
+      pressRef.current = { down: true, startedAt: Date.now() };
+      beginRecording();
     }
   };
 
@@ -285,7 +333,7 @@ export default function ElderHomePage() {
           saveSettings(s);
           setSettings(s);
           setEditingSettings(false);
-          say(`ধন্যবাদ, ${s.name}। কথা বলতে বড় কালো বোতামটি চাপুন।`);
+          say(`ধন্যবাদ, ${s.name}। কথা বলতে বড় কালো বোতামটি চেপে ধরে রাখুন।`);
         }}
       />
     );
@@ -293,7 +341,7 @@ export default function ElderHomePage() {
 
   const latest = [...logs].sort((a, b) => new Date(b.measured_at).getTime() - new Date(a.measured_at).getTime())[0];
   const latestLevel = latest ? classifyGlucose(latest.glucose_value) : null;
-  const welcome = `${greeting}, ${settings.name}। কথা বলতে বড় কালো বোতামটি চাপুন।`;
+  const welcome = `${greeting}, ${settings.name}। কথা বলতে বড় কালো বোতামটি চেপে ধরে রাখুন।`;
 
   return (
     <main lang="bn" className="flex min-h-dvh flex-col px-5 pt-[calc(env(safe-area-inset-top)+1.5rem)] pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
@@ -347,7 +395,7 @@ export default function ElderHomePage() {
             </div>
           </div>
         ) : (
-          <p className="text-lg font-semibold text-ink-soft">এখনো কোনো সুগার রাখা হয়নি। বোতাম চেপে বলুন বা মিটারের ছবি তুলুন।</p>
+          <p className="text-lg font-semibold text-ink-soft">এখনো কোনো সুগার রাখা হয়নি। বড় বোতাম চেপে ধরে বলুন, বা মিটারের ছবি তুলুন।</p>
         )}
       </section>
 
@@ -355,10 +403,15 @@ export default function ElderHomePage() {
       <section className="flex flex-1 flex-col items-center justify-center py-8">
         <button
           type="button"
-          onClick={toggleMic}
+          onPointerDown={onTalkDown}
+          onPointerUp={onTalkUp}
+          onPointerCancel={onTalkUp}
+          onClick={onTalkKeyboard}
+          onContextMenu={(e) => e.preventDefault()}
+          style={{ touchAction: "none", WebkitTouchCallout: "none" }}
           disabled={phase === "thinking"}
-          aria-label={phase === "recording" ? "বলা শেষ" : "কথা বলুন"}
-          className={`relative flex h-44 w-44 items-center justify-center rounded-full text-white shadow-float transition-transform active:scale-95 disabled:opacity-80 ${
+          aria-label={phase === "recording" ? "শুনছি, ছেড়ে দিলে পাঠাবো" : "চেপে ধরে কথা বলুন"}
+          className={`relative flex h-44 w-44 select-none items-center justify-center rounded-full text-white shadow-float transition-transform active:scale-95 disabled:opacity-80 ${
             phase === "recording" ? "bg-pastel-coral-strong" : "bg-ink"
           }`}
         >
@@ -372,7 +425,7 @@ export default function ElderHomePage() {
           )}
         </button>
         <p className="mt-5 text-center text-2xl font-bold text-ink" aria-live="polite">
-          {phase === "recording" ? "শুনছি… বলা শেষ হলে আবার চাপুন" : phase === "thinking" ? "একটু অপেক্ষা করুন…" : "কথা বলুন"}
+          {phase === "recording" ? "শুনছি… বলা শেষ হলে ছেড়ে দিন" : phase === "thinking" ? "একটু অপেক্ষা করুন…" : "চেপে ধরে কথা বলুন"}
         </p>
 
         {reply && phase === "idle" && (
