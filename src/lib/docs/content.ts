@@ -286,6 +286,7 @@ Nothing is saved until the user hears the value read back and taps **ঠিক �
 | Validation | Zod | Every model output is schema-checked |
 | Charts | Recharts | Dashboard graphs with table fallbacks |
 | Docs | marked + Mermaid | This page |
+| Agent interface | Model Context Protocol SDK (Streamable HTTP) | Other AI agents can use Jotno's safety rules |
 | Tests | Vitest, Testing Library, jsdom | 160+ tests incl. safety, RLS and docs-API sync |
 `),
     },
@@ -298,6 +299,37 @@ Nothing is saved until the user hears the value read back and taps **ঠিক �
 **Auth model:** the patient app works without an account (demo/local mode). When Supabase Auth is configured, a signed-in user's readings and scans are written to Postgres under row-level security. **session-optional** means "works signed out, persists when signed in". The docs admin endpoints need the signed admin cookie.
 
 All JSON endpoints return \`{ error }\` with a 4xx/5xx status on failure. AI endpoints have hard time budgets so they finish within the serverless limit.
+`),
+    },
+    {
+      id: "mcp",
+      group: "technical",
+      title: "MCP server",
+      body: md(`
+Jotno ships its own **Model Context Protocol server** at \`/api/mcp\`. Any MCP client (Claude Code, Claude Desktop, IDE agents, a doctor's AI assistant) can use Jotno's safety and nutrition engines directly.
+
+**Connect (Claude Code):**
+
+\`\`\`
+claude mcp add --transport http jotno https://jotno-omega.vercel.app/api/mcp
+\`\`\`
+
+**Transport:** Streamable HTTP, stateless (a fresh server per request, which suits serverless), JSON responses. Built on the official \`@modelcontextprotocol/sdk\`.
+
+| Tool | What it does |
+|---|---|
+| \`check_medication_safety\` | English + Bangla dose guardrail, returns the refusal |
+| \`classify_glucose\` | Fixed clinical bands, emergency flag, spoken Bangla feedback |
+| \`audit_menu_dishes\` | High-GI Bangladeshi dish traps, risk and waiter script |
+| \`lookup_nutrition\` | Curated KB, then Open Food Facts, then USDA |
+| \`analyze_fiber_gap\` | Weekly gap and local foods priced in ৳ |
+| \`get_feature_status\` | Live feature states of this deployment |
+| \`get_api_reference\` | Every HTTP endpoint |
+| \`search_docs\` | Search these docs |
+
+**Resources:** \`jotno://docs/{id}\` (every section of this page as Markdown) and \`jotno://catalog/bazaar\`. **Prompt:** \`explain_reading_bn\`.
+
+**Safe to expose publicly:** every tool is read-only (\`readOnlyHint\`), stores nothing, takes no personal data and never calls an LLM, so it can't leak patient data or spend AI quota. The same safety rules the app uses now protect any agent that connects.
 `),
     },
     {

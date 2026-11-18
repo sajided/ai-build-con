@@ -114,7 +114,7 @@ describe("/docs content", () => {
     for (const id of [
       "problem", "solution", "why-now", "demo", "market", "business-model", "traction", "competition",
       "advantage", "gtm", "team", "vision", "overview", "features", "architecture", "data-flow", "stack",
-      "api", "data-layer", "ai-layer", "roadmap", "performance", "security", "analytics", "contributors", "changelog",
+      "api", "mcp", "data-layer", "ai-layer", "roadmap", "performance", "security", "analytics", "contributors", "changelog",
     ]) {
       expect(ids).toContain(id);
     }
@@ -144,7 +144,7 @@ describe("/docs API reference stays in sync with the code", () => {
       if (statSync(full).isDirectory()) walk(full);
       else if (name === "route.ts") {
         const src = readFileSync(full, "utf8");
-        const methods = Array.from(src.matchAll(/export (?:async )?function (GET|POST|PUT|DELETE|PATCH)\b/g)).map((m) => m[1]);
+        const methods = Array.from(src.matchAll(/export (?:async function|function|const) (GET|POST|PUT|DELETE|PATCH)\b/g)).map((m) => m[1]);
         const reexport = src.match(/export \{ ([A-Z, ]+) \} from/);
         if (reexport) methods.push(...reexport[1].split(",").map((m) => m.trim()));
         routes.push({ path: "/api/" + path.relative(apiRoot, path.dirname(full)).split(path.sep).join("/"), methods: methods.sort() });

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "jotno": {
+      "type": "http",
+      "url": "https://jotno-omega.vercel.app/api/mcp"
+    }
+  }
+}

@@ -169,6 +169,23 @@ flowchart LR
 
 ---
 
+## 🔌 Jotno MCP server
+
+Jotno exposes its deterministic safety and nutrition engines over the **Model Context Protocol**, so any AI agent can use the same rules the app does.
+
+```bash
+claude mcp add --transport http jotno https://jotno-omega.vercel.app/api/mcp
+```
+
+This repo also has a `.mcp.json`, so Claude Code picks the server up automatically here.
+
+- **Transport:** Streamable HTTP, stateless, JSON responses (`src/app/api/mcp/route.ts`, official `@modelcontextprotocol/sdk`)
+- **8 read-only tools:** `check_medication_safety`, `classify_glucose`, `audit_menu_dishes`, `lookup_nutrition`, `analyze_fiber_gap`, `get_feature_status`, `get_api_reference`, `search_docs`
+- **Resources:** `jotno://docs/{id}` (every `/docs` section) and `jotno://catalog/bazaar`. **Prompt:** `explain_reading_bn`
+- **Safe to expose publicly:** no personal data, nothing stored, no LLM calls. Tested with a real MCP client in `src/__tests__/mcp-server.test.ts`
+
+---
+
 ## 🚀 Quick start
 
 ```bash
@@ -236,7 +253,7 @@ never medication doses, and does not replace a doctor. Simulation and sample dat
 
 ## 👥 Team
 
-Built for the hackathon by **sajided**, **Md. Junaid Al Habib Siam** and **bijan-sarkar**.
+Built for the hackathon by **Sajid Ali** (team lead), **Bijan Sarkar**, **Nazifa Kawsar**, **Md. Junaid Al Habib Siam** and **Jannatul Ferdous**.
 
 <div align="center">
 
