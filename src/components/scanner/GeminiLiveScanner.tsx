@@ -432,19 +432,22 @@ export default function GeminiLiveScanner() {
       if (presetOverride) {
         formData.append("preset", presetOverride.payload);
       } else if (fileOverride) {
-        const compressed = await compressImageForFastScan(fileOverride, 800, 0.75);
+        const compressed = await compressImageForFastScan(fileOverride, 720, 0.72);
         formData.append("image", compressed, "upload.jpg");
       } else {
         const frame = await captureFrameSnapshot();
         if (frame) {
           formData.append("image", frame, "frame.jpg");
         } else if (capturedImage) {
-          // capturedImage is a data URL; send it as a real file, not a string field
+          // capturedImage is a data URL; send it as a real file
           const blob = await (await fetch(capturedImage)).blob();
           formData.append("image", blob, "upload.jpg");
         } else if (!audioBlob && !queryToSend) {
-          // No camera frame (demo laptop / permission denied): show the sample basket
-          formData.append("preset", "mock-preset");
+          // Camera is inactive and no image uploaded
+          showScanError("ক্যামেরা থেকে ছবি পাওয়া যায়নি। অনুগ্রহ করে ক্যামেরা চালু করুন বা গ্যালারি থেকে ছবি আপলোড করুন।");
+          inFlightRef.current = false;
+          setIsProcessing(false);
+          return;
         }
       }
 

@@ -401,6 +401,12 @@ TAILORED OUTPUT REQUIREMENTS:
 CRITICAL LANGUAGE REQUIREMENT FOR VOICE ASSISTANT:
 - "voice_assistant_response" MUST ALWAYS be in very clear, warm, conversational spoken Bangla (বাংলা ভাষায়), delivered as a caring female clinical health companion advising a diabetic patient. Keep it to 2 concise sentences answering what is shown and how to eat safely.
 
+CRITICAL MANDATORY REQUIREMENT FOR ALL MODES:
+- ALWAYS populate "identified_items" with 2 to 8 items or dishes detected in the image or query.
+- For "restaurant_menu": Every dish on the menu (e.g. Rice, Naan, Chicken, Salad, Dal, Drinks) MUST be added as an item in "identified_items" with its estimated GI and GL.
+- For "grocery_bazaar": Every produce or pantry item MUST be in "identified_items".
+- For "prepared_food": Every food component on the plate MUST be in "identified_items".
+
 CRITICAL CURRENCY & ECONOMY REQUIREMENT:
 - All cost, price, and economy suggestions MUST be given in Bangladeshi Taka (৳ / টাকা). Never quote USD to the user.
 
@@ -409,7 +415,7 @@ Return ONLY a raw JSON object matching this schema with NO markdown code fences:
   "detected_type": "grocery_bazaar" | "restaurant_menu" | "prepared_food",
   "detected_title": "string",
   "identified_items": [
-    { "name": "string", "quantity": "string", "category": "string", "gi_index": number, "net_carbs_g": number (net carbs per typical serving), "gl_load": number, "risk_level": "green"|"yellow"|"red" }
+    { "name": "string", "quantity": "string", "category": "string", "gi_index": number, "net_carbs_g": number, "gl_load": number, "risk_level": "green"|"yellow"|"red" }
   ],
   "nutritional_summary": {
     "calories": number,
@@ -435,6 +441,7 @@ Return ONLY a raw JSON object matching this schema with NO markdown code fences:
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), timeoutMs);
         try {
+          const isThinkingModel = model.includes("2.5");
           const response = await Promise.race([
             ai.models.generateContent({
               model,
@@ -444,6 +451,7 @@ Return ONLY a raw JSON object matching this schema with NO markdown code fences:
                 // Bangla text + full schema needs headroom; truncated JSON used to fall back to sample data.
                 maxOutputTokens: 4096,
                 temperature: 0.2,
+                ...(isThinkingModel ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
                 abortSignal: controller.signal,
               },
             }),
@@ -453,6 +461,7 @@ Return ONLY a raw JSON object matching this schema with NO markdown code fences:
               )
             ),
           ]);
+          console.log(`[Gemini ${model} Raw Text]:`, response.text?.slice(0, 500));
           return parseAndGuardMultimodalOutput(response.text || "");
         } finally {
           clearTimeout(timer);
@@ -467,7 +476,7 @@ Return ONLY a raw JSON object matching this schema with NO markdown code fences:
         try {
           let guarded: GuardedOutput;
           try {
-            guarded = await callModel(model, Boolean(audioBase64), Math.min(12000, remaining()));
+            guarded = await callModel(model, Boolean(audioBase64), Math.min(14000, remaining()));
           } catch (audioOrModelErr) {
             // If audio was included, retry once without it in case the audio codec failed
             if (!audioBase64 || remaining() < MIN_ATTEMPT_MS) throw audioOrModelErr;

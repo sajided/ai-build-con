@@ -130,6 +130,12 @@ export function parseAndGuardMultimodalOutput(rawText: string): GuardedOutput {
   }
 
   if (items.length === 0) {
+    const isNoFoodDetected =
+      (out.detected_title && /no food|non-food|blank|unknown|plain/i.test(out.detected_title)) ||
+      (out.voice_assistant_response && /কোনো খাবার|খাবার দেখতে|খাবার দেখা যাচ্ছে না|খাবার নেই/i.test(out.voice_assistant_response));
+    if (isNoFoodDetected) {
+      return { ...out, identified_items: [] };
+    }
     throw new Error("Model returned no usable food items");
   }
 
