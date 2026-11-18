@@ -10,6 +10,7 @@ import {
   auditRecipeIngredients,
   auditEatingSequence,
 } from "@/lib/ai/recipe-auditor";
+import { buildRagPromptContext } from "@/lib/rag/nutrition-fetcher";
 
 /**
  * Standard benchmark recipe for TC-P3-01:
@@ -273,6 +274,9 @@ export async function generateDiabeticRecipes(
     try {
       const ai = new GoogleGenAI({ apiKey: env.geminiApiKey });
 
+      // Ground Gemini recipe synthesis with verified clinical nutrition RAG knowledge base
+      const ragContext = await buildRagPromptContext(ingredients);
+
       const response = await ai.models.generateContent({
         model: "gemini-3.8-flash",
         contents: [
@@ -280,8 +284,9 @@ export async function generateDiabeticRecipes(
             role: "user",
             parts: [
               { text: RECIPE_GENERATOR_SYSTEM_PROMPT },
+              ...(ragContext ? [{ text: ragContext }] : []),
               {
-                text: `Available Scanned Ingredients: ${JSON.stringify(ingredients)}. Generate 2 diabetic recipes.`,
+                text: `Available Scanned Ingredients: ${JSON.stringify(ingredients)}. Ground the recipe macros, glycemic impact, and 3-tier sequence strictly in the verified clinical RAG data above. Generate 2 diabetic recipes.`,
               },
             ],
           },

@@ -1,6 +1,12 @@
 {
-  "generatedAt": "2026-11-18T12:09:21.336Z",
+  "generatedAt": "2026-11-18T15:49:57.330Z",
   "commits": [
+    {
+      "hash": "f3c18b7",
+      "date": "2026-11-18T19:40:43+06:00",
+      "author": "sajided",
+      "subject": "feat(docs): live /docs pitch deck and technical docs with admin scheduling"
+    },
     {
       "hash": "c61b04c",
       "date": "2026-11-09T18:07:19+06:00",
@@ -134,7 +140,7 @@
       "subject": "Initial commit from Create Next App"
     }
   ],
-  "commitCount": 22,
+  "commitCount": 23,
   "tests": {
     "passed": 162,
     "failed": 0,

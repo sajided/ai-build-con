@@ -5,6 +5,7 @@ import { measurementContextSchema } from "@/lib/validations/telemetry";
 import { fromBanglaDigits, toBanglaDigits } from "@/lib/assistant/bangla";
 import { BANGLA_CLINICAL_REFUSAL, isUnsafeRequest, scrubReply } from "@/lib/assistant/safety";
 import { shrinkSpeechWav } from "@/lib/assistant/wav";
+import { queryNutritionSources } from "@/lib/rag/nutrition-fetcher";
 
 /**
  * Bangla voice/photo assistant for elderly users.
@@ -50,7 +51,7 @@ const RESPONSE_SCHEMA = {
   required: ["transcript", "reply", "action"],
 };
 
-function systemPrompt(mode: AssistantMode, userName?: string) {
+function systemPrompt(mode: AssistantMode, userName?: string, ragContext?: string) {
   const who = userName ? `ব্যবহারকারীর নাম ${userName}।` : "";
   const modeRule = {
     talk: "ব্যবহারকারী বাংলায় কথা বলেছেন। আগে transcript-এ ঠিক যা বলেছেন তা লিখুন।",
@@ -59,6 +60,8 @@ function systemPrompt(mode: AssistantMode, userName?: string) {
     food:
       "ছবিটি খাবার বা বাজারের জিনিসের। কী কী দেখছেন বাংলায় নাম বলুন এবং ডায়াবেটিসের জন্য কেমন তা বলুন। food_verdict: good (ভালো), limit (অল্প খান), avoid (এড়িয়ে চলুন)। পরিমাণ বলতে মুঠো, কাপ, চামচ ব্যবহার করুন, গ্রাম নয়।",
   }[mode];
+
+  const ragSection = ragContext ? `\nক্লিনিক্যাল পুষ্টি জ্ঞানভাণ্ডার (RAG Grounding):\n${ragContext}` : "";
 
   return `আপনি "সুগার সাথী", একজন বয়স্ক ডায়াবেটিস রোগীর বাংলা সহায়ক। ${who}
 নিয়ম:
@@ -70,7 +73,7 @@ function systemPrompt(mode: AssistantMode, userName?: string) {
 - মাথা ঘোরা, কাঁপুনি, ঘাম, বুক ধড়ফড়, অজ্ঞান লাগা, বুকে ব্যথা, শ্বাসকষ্ট বললে: action=call_for_help এবং বলুন এখনই কাউকে ডাকতে।
 - ওষুধ বা ইনসুলিনের মাত্রা, ওষুধ বন্ধ/বাড়ানো/কমানো নিয়ে কখনো পরামর্শ দেবেন না; বলুন ডাক্তারের সাথে কথা বলতে।
 - আপনি ডাক্তার নন। নিশ্চিত না হলে ডাক্তারের কাছে যেতে বলুন।
-${modeRule}`;
+${modeRule}${ragSection}`;
 }
 
 const withTimeout = <T,>(p: Promise<T>, ms: number) =>
@@ -129,6 +132,46 @@ export function fallbackResult(input: AssistantInput): AssistantResult {
       };
     }
   }
+
+  // Resilient offline food evaluation grounded in diabetic dietary baselines
+  if (input.mode === "food" || (input.text && /খাবার|ভাত|রুটি|আলু|করলা|উচ্ছে|মিষ্টি|ডাল|ফল|শাক|শসা/i.test(input.text))) {
+    const text = (input.text || "").toLowerCase();
+    if (text.includes("করলা") || text.includes("উচ্ছে") || text.includes("শাক") || text.includes("শসা") || text.includes("লাউ")) {
+      return {
+        transcript: input.text ?? "",
+        reply: "করলা ও সবুজ শাকসবজি ডায়াবেটিসের জন্য খুব ভালো। এগুলো রক্তে সুগার কমাতে সাহায্য করে।",
+        action: "none",
+        food_verdict: "good",
+        source: "fallback",
+      };
+    }
+    if (text.includes("ভাত") || text.includes("আলু") || text.includes("রুটি") || text.includes("পরোটা")) {
+      return {
+        transcript: input.text ?? "",
+        reply: "ভাত ও আলুতে শর্করা বেশি থাকে। এক কাপ বা পরিমিত পরিমাণে খাওয়া ভালো।",
+        action: "none",
+        food_verdict: "limit",
+        source: "fallback",
+      };
+    }
+    if (text.includes("মিষ্টি") || text.includes("চিনি") || text.includes("মধু") || text.includes("রসগোল্লা") || text.includes("সন্দেশ")) {
+      return {
+        transcript: input.text ?? "",
+        reply: "মিষ্টি বা চিনি রক্তে সুগার দ্রুত বাড়িয়ে দেয়। এটি এড়িয়ে চলাই নিরাপদ।",
+        action: "none",
+        food_verdict: "avoid",
+        source: "fallback",
+      };
+    }
+    return {
+      transcript: input.text ?? "",
+      reply: "শাকসবজি ও ডাল বেশি খান এবং ভাত বা রুটির পরিমাণ কম রাখুন।",
+      action: "none",
+      food_verdict: "good",
+      source: "fallback",
+    };
+  }
+
   return {
     transcript: input.text ?? "",
     reply: "দুঃখিত, এখন উত্তর দিতে পারছি না। একটু পরে আবার চেষ্টা করুন।",
@@ -143,6 +186,29 @@ export async function runElderAssistant(input: AssistantInput): Promise<Assistan
   }
   if (!getSystemEnvStatus().gemini.isLive) return fallbackResult(input);
 
+  // Retrieve clinical RAG knowledge context if evaluating food/diet
+  let ragContext = "";
+  if (
+    input.mode === "food" ||
+    (input.text && /খাবার|ভাত|রুটি|আলু|করলা|উচ্ছে|মিষ্টি|ডাল|ফল|আম|মাছ|মাংস|ডিম|food|rice|dal|potato|karela/i.test(input.text))
+  ) {
+    try {
+      const queryWord = input.text ? input.text.slice(0, 50) : "diabetic staple vegetables";
+      const nutrition = await queryNutritionSources(queryWord);
+      if (nutrition.length > 0) {
+        ragContext = nutrition
+          .slice(0, 3)
+          .map(
+            (n) =>
+              `- ${n.name}${n.bangla_name ? ` (${n.bangla_name})` : ""}: GI ${n.glycemic_index_est ?? "N/A"}, GL ${n.glycemic_load_est ?? "N/A"}, Fiber ${n.fiber_g}g. ${n.clinical_notes || ""}`
+          )
+          .join("\n");
+      }
+    } catch {
+      // Non-blocking RAG fallback
+    }
+  }
+
   const ai = new GoogleGenAI({ apiKey: env.geminiApiKey });
   const contents = [{ role: "user", parts: buildParts(input) }];
 
@@ -153,7 +219,7 @@ export async function runElderAssistant(input: AssistantInput): Promise<Assistan
           model,
           contents,
           config: {
-            systemInstruction: systemPrompt(input.mode, input.userName),
+            systemInstruction: systemPrompt(input.mode, input.userName, ragContext),
             responseMimeType: "application/json",
             responseSchema: RESPONSE_SCHEMA,
             temperature: 0.3,
