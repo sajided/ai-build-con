@@ -11,7 +11,7 @@ import { queryNutritionSources } from "@/lib/rag/nutrition-fetcher";
  * Bangla voice/photo assistant for elderly users.
  * Flash-lite models answer in ~2s; the larger flash model is a last resort when lite models are busy.
  */
-export const ASSISTANT_MODELS = ["gemini-2.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.5-flash"];
+export const ASSISTANT_MODELS = ["gemini-3-flash-preview", "gemini-3.1-flash-lite-preview", "gemini-3.5-flash-lite", "gemini-2.5-flash"];
 export const TTS_MODELS = ["gemini-3.8-flash-lite-tts", "gemini-2.5-flash-preview-tts", "gemini-3.8-flash-tts"];
 const MODEL_TIMEOUT_MS = 9000;
 /** Working TTS models take ~3.5–4.5 s for a short Bangla sentence, longer for long ones */
@@ -214,6 +214,7 @@ export async function runElderAssistant(input: AssistantInput): Promise<Assistan
 
   for (const model of ASSISTANT_MODELS) {
     try {
+      const isThinkingModel = model.includes("2.5") || model.includes("gemini-3");
       const response = await withTimeout(
         ai.models.generateContent({
           model,
@@ -223,6 +224,7 @@ export async function runElderAssistant(input: AssistantInput): Promise<Assistan
             responseMimeType: "application/json",
             responseSchema: RESPONSE_SCHEMA,
             temperature: 0.3,
+            ...(isThinkingModel ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
           },
         }),
         MODEL_TIMEOUT_MS

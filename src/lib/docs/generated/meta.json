@@ -1,6 +1,24 @@
 {
-  "generatedAt": "2026-11-18T16:36:07.941Z",
+  "generatedAt": "2026-11-18T17:39:51.745Z",
   "commits": [
+    {
+      "hash": "6b8992e",
+      "date": "2026-11-18T23:00:47+06:00",
+      "author": "bijan-sarkar",
+      "subject": "Merge branch 'feat/rag-integration' into main - High-performance diabetic RAG & multimodal vision integration"
+    },
+    {
+      "hash": "dc9ee0e",
+      "date": "2026-11-18T23:00:33+06:00",
+      "author": "bijan-sarkar",
+      "subject": "docs(rag): add RAG architecture specification, clinical baselines, and performance documentation"
+    },
+    {
+      "hash": "4840585",
+      "date": "2026-11-18T22:37:23+06:00",
+      "author": "bijan-sarkar",
+      "subject": "fix(scanner): disable 2.5-flash thinking to stop 14s timeouts, guard empty frames, and prevent silent fallback to demo basket"
+    },
     {
       "hash": "80bfaad",
       "date": "2026-11-18T21:56:43+06:00",
@@ -152,7 +170,7 @@
       "subject": "Initial commit from Create Next App"
     }
   ],
-  "commitCount": 25,
+  "commitCount": 28,
   "tests": {
     "passed": 162,
     "failed": 0,

@@ -347,7 +347,7 @@ export async function POST(req: NextRequest) {
 
     // Call Gemini Flash models if live API key is available
     if (envStatus.gemini.isLive && !userChoseSample && (imageBase64 || audioBase64 || textQuery)) {
-      const CANDIDATE_MODELS = ["gemini-2.5-flash", "gemini-3.5-flash-lite"];
+      const CANDIDATE_MODELS = ["gemini-3-flash-preview", "gemini-3.1-flash-lite-preview"];
       const ai = new GoogleGenAI({ apiKey: env.geminiApiKey });
 
       type ContentPart =
@@ -441,7 +441,7 @@ Return ONLY a raw JSON object matching this schema with NO markdown code fences:
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), timeoutMs);
         try {
-          const isThinkingModel = model.includes("2.5");
+          const isThinkingModel = model.includes("2.5") || model.includes("gemini-3");
           const response = await Promise.race([
             ai.models.generateContent({
               model,
