@@ -19,6 +19,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   // The standalone judges' demo draws its own phone frame and needs the full desktop width
   if (pathname.startsWith("/demo")) return <>{children}</>;
+  // /docs is a full-width document for judges and investors, not a phone screen
+  if (pathname.startsWith("/docs")) return <>{children}</>;
   if (simulating) return <AppSimulation frameClassName={APP_FRAME} onExit={exitSimulation} />;
 
   // "/" is the simple Bangla voice home, which has its own large controls

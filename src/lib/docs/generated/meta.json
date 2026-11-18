@@ -1,0 +1,145 @@
+{
+  "generatedAt": "2026-11-18T12:09:21.336Z",
+  "commits": [
+    {
+      "hash": "c61b04c",
+      "date": "2026-11-09T18:07:19+06:00",
+      "author": "sajided",
+      "subject": "docs: hackathon README with judges' guide, screenshots and architecture"
+    },
+    {
+      "hash": "b962f0b",
+      "date": "2026-11-09T16:16:46+06:00",
+      "author": "sajided",
+      "subject": "feat(demo): play the simulation beside the real app, add menu, nutrition, bazaar and recipe chapters"
+    },
+    {
+      "hash": "b31e953",
+      "date": "2026-11-09T16:16:46+06:00",
+      "author": "sajided",
+      "subject": "feat(dashboard): sugar graphs and insights"
+    },
+    {
+      "hash": "3f14744",
+      "date": "2026-11-09T15:49:23+06:00",
+      "author": "sajided",
+      "subject": "feat(demo): guided simulation for hackathon judges, and fix Bangla voice"
+    },
+    {
+      "hash": "dc6ec63",
+      "date": "2026-11-09T15:21:41+06:00",
+      "author": "sajided",
+      "subject": "feat(home): push-to-talk on the big mic button"
+    },
+    {
+      "hash": "b257f20",
+      "date": "2026-11-09T15:19:19+06:00",
+      "author": "sajided",
+      "subject": "feat(home): simplify actions into one 2x2 grid of equal tiles"
+    },
+    {
+      "hash": "a9fd950",
+      "date": "2026-11-09T15:04:44+06:00",
+      "author": "sajided",
+      "subject": "feat(ui): consistent elder-first Bangla UI across the app"
+    },
+    {
+      "hash": "84632f7",
+      "date": "2026-11-09T14:49:59+06:00",
+      "author": "sajided",
+      "subject": "fix(menusafe): stop marking biryani, naan and sweets as safe"
+    },
+    {
+      "hash": "d623d0c",
+      "date": "2026-11-09T14:49:59+06:00",
+      "author": "sajided",
+      "subject": "fix(live-scan): guard Gemini output, fit 30s budget, one tap = one scan"
+    },
+    {
+      "hash": "27c7802",
+      "date": "2026-11-09T14:24:24+06:00",
+      "author": "sajided",
+      "subject": "merge: bring reminders, family alerts, and doctor report into jotno-live-scan"
+    },
+    {
+      "hash": "2433e9e",
+      "date": "2026-11-08T23:53:05+06:00",
+      "author": "bijan-sarkar",
+      "subject": "fix(scanner): add maxDuration=30, candidate model fallback, and UI status indicator for Vercel deployment"
+    },
+    {
+      "hash": "30eec82",
+      "date": "2026-11-08T23:03:47+06:00",
+      "author": "bijan-sarkar",
+      "subject": "fix(build): remove unused icon imports for clean production build"
+    },
+    {
+      "hash": "7ed4be7",
+      "date": "2026-11-08T22:53:32+06:00",
+      "author": "bijan-sarkar",
+      "subject": "feat: Jotno Live Scan, mmol/L diabetes metrics, Bangladeshi Taka pricing, and performance optimizations"
+    },
+    {
+      "hash": "fd2252d",
+      "date": "2026-11-07T16:27:27+06:00",
+      "author": "sajided",
+      "subject": "feat: medicine & daily-care reminders, family alerts, and doctor report"
+    },
+    {
+      "hash": "c204a6d",
+      "date": "2026-10-31T00:39:37+06:00",
+      "author": "sajided",
+      "subject": "feat: app shell, Jotno rebrand, and elder assistant with Bangla TTS"
+    },
+    {
+      "hash": "5877842",
+      "date": "2026-10-25T13:07:51+06:00",
+      "author": "Md. Junaid Al Habib Siam",
+      "subject": "test: add DOM safety alert and PWA audit test cases for Phase 7"
+    },
+    {
+      "hash": "a3388bb",
+      "date": "2026-10-25T13:02:08+06:00",
+      "author": "Md. Junaid Al Habib Siam",
+      "subject": "feat: complete Phase 7 clinical safety guardrails, PWA offline fallback, and QA"
+    },
+    {
+      "hash": "38a1d4a",
+      "date": "2026-10-25T12:50:09+06:00",
+      "author": "Md. Junaid Al Habib Siam",
+      "subject": "test: add DOM component integration tests for TC-P6-01 and TC-P6-02"
+    },
+    {
+      "hash": "1238050",
+      "date": "2026-10-25T12:47:25+06:00",
+      "author": "Md. Junaid Al Habib Siam",
+      "subject": "feat: complete Phase 6 nutritional gap engine and local bazaar recommendations"
+    },
+    {
+      "hash": "03199d3",
+      "date": "2026-10-25T12:30:55+06:00",
+      "author": "Md. Junaid Al Habib Siam",
+      "subject": "feat: complete Phase 5 blood glucose telemetry and dual-trajectory analytics"
+    },
+    {
+      "hash": "c6d4d21",
+      "date": "2026-10-25T02:00:23+06:00",
+      "author": "Md. Junaid Al Habib Siam",
+      "subject": "feat: complete Phase 4 MenuSafe restaurant menu auditor and waiter scripts"
+    },
+    {
+      "hash": "5b0b722",
+      "date": "2026-10-24T23:59:03+06:00",
+      "author": "Md. Junaid Al Habib Siam",
+      "subject": "Initial commit from Create Next App"
+    }
+  ],
+  "commitCount": 22,
+  "tests": {
+    "passed": 162,
+    "failed": 0,
+    "skipped": 1,
+    "files": 20,
+    "ranAt": "2026-11-18T12:09:40.439Z"
+  }
+}

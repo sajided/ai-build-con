@@ -4,12 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/docs-meta.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "demo:voice": "GENERATE_DEMO_VOICE=1 vitest run scripts/generate-demo-voice.test.ts"
+    "demo:voice": "GENERATE_DEMO_VOICE=1 vitest run scripts/generate-demo-voice.test.ts",
+    "docs:meta": "node scripts/docs-meta.mjs --with-tests"
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",
@@ -18,6 +20,8 @@
     "@supabase/supabase-js": "^2.118.0",
     "clsx": "^2.1.1",
     "lucide-react": "^1.61.0",
+    "marked": "^12.0.2",
+    "mermaid": "^10.9.1",
     "next": "14.2.35",
     "react": "^18",
     "react-dom": "^18",
